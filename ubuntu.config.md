@@ -50,7 +50,7 @@ $ sudo systemctl restart jenkins
 - connect browser
 - paste password
 - install suggested plugins or select plugin to install
-- create first admin user (jenkinsPassw0rd!)
+- create first admin user
 - instance configuration
 - Jenkins Management > Jenkins Tool Configuration
 ~~~
