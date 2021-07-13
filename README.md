@@ -1,3 +1,5 @@
 # ubuntu
 
-### ubuntu system configuration
+### system configuration for ubunut
+
+- java environtment
