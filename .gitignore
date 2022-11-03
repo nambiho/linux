@@ -3,3 +3,6 @@ pass*
 
 # files
 ubuntu.config.md
+
+# dir
+.DS_Store/
