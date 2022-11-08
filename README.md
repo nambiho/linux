@@ -199,3 +199,15 @@ $ node --version
 $ exit
 
 ```
+
+### change runlevel
+```
+# 0 poweroff.target 
+# 1 rescue.target 
+# 2, 3, 4 multi-user.target 
+# 5 graphical.target
+# 6 reboot.target
+
+$ sudo systemctl set-default multi-user.target
+Created symlink /etc/systemd/system/default.target → /lib/systemd/system/multi-user.target.
+```
