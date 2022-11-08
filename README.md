@@ -91,7 +91,16 @@ sudo service jenkins start
 ```
 
 ### jenkins.service java version
+##### version swich : 11 <-> 17
 ```
+$ cd /usr/bin
+$ ll java
+lrwxrwxrwx 1 root root 22 Jul  6  2021 java -> /etc/alternatives/java*
+
+$ cd /etc/alternatives
+$ ll java
+lrwxrwxrwx 1 root root 43 Nov  8 14:20 java -> /usr/lib/jvm/java-17-openjdk-amd64/bin/java*
+
 $ update-alternatives --config java
 
 There are 3 choices for the alternative java (providing /usr/bin/java).
