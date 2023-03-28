@@ -55,16 +55,43 @@ $ dpkg -l nginx
 # java
 ### install java
 ~~~
+$ cd /etc/apt
+$ mkdir keyrings
 $ apt-get update
 $ wget -O - https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/keyrings/adoptium.asc
 $ echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list
 $ apt-get install temurin-17.jdk
+$ vi /etc/profile
+
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f /usr/bin/java)))
+    export PATH=$PATH:$JAVA_HOME/bin
+
+$ echo $JAVA_HOME
 ~~~
 
 ### delete java
 ~~~
 $ sudo apt-get purge temurin*
 ~~~
+
+
+
+# Docker
+~~~
+$ sudo apt-get remove docker docker-engine docker.io containerd runc
+$ sudo apt-get update
+$ sudo apt-get install ca-certificates curl gnupg
+$ sudo mkdir -m 0755 -p /etc/apt/keyrings
+$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+$ echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+$ sudo apt-get update
+$ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+$ sudo docker run hello-world
+~~~
+
 
 # nginx
 ~~~
@@ -81,7 +108,28 @@ $ vi miraean.site
 $ service nginx restart
 ~~~
 
+
+# nodejs
+[Source github](https://deb.nodesource.com)
+~~~
+$ curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+$ apt-get update
+$ sudo apt-get install -y nodejs
+$ node --version
+~~~
+
+# mysql
+~~~
+$ apt update
+$ apt install mysql-server
+$ mysql --version
+~~~
+
 # certbot
+### required
+- registed url in dns
+
+### console command for nginx
 - $ sudo certbot certonly --nginx 
 - $ sudo certbot --nginx
 ~~~
