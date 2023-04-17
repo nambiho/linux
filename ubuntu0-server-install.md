@@ -103,7 +103,7 @@ $ apt install nginx
 $ cd /etc/nginx/sites-available
 $ vi miraean.site
 
-# server setting
+  # server setting
 
 $ service nginx restart
 ~~~
