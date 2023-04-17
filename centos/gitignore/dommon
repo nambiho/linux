@@ -1,0 +1,106 @@
+#!/bin/sh
+# Domino Monitor Start Script
+# Licenced Materials - Property of IBM
+# (C) COPYRIGHT International Business Machines Corp 1994,1998
+# All Rights Reserved.
+# US Government Users Restricted Rights - Use, duplication or disclosure
+# restricted by GSA ADP Schedule Contract with IBM Corp.
+########################################################################
+ 
+# Set Script Environment variables.
+
+NOTES_USER=notes				# AIX user id for this server   
+NOTES_PATH=/hdd/ext1/notesdata  		        # Path for server data directory	
+NOTES_SERVER=wing				# Name of Domino Server
+LOTUS_PATH=/opt/hcl/domino	                # Program folder of server
+OUTPUT_LOG=$NOTES_PATH/log/$NOTES_SERVER.log	# Output file for server console
+INPUT_FILE=$NOTES_PATH/$NOTES_USER.input		# Input file for server console
+
+
+CURRENT_TTY=`tty`
+
+# Script Logic 
+
+if ((`id -u` != `id -u $NOTES_USER`))
+then
+   print "Please monitor the Domino Server as the $NOTES_USER user "
+   exit
+fi
+
+if [[ $# -gt 1 ]]; then
+   echo "\nSyntax:\n dommon\n"
+   echo "This program attaches to the Lotus Domino Server input and output"
+   echo "\nUse . to exit the monitor.\n"
+   exit 1
+fi
+
+function stop_monitor
+{
+   echo ""
+   echo "Exiting notes monitor..."
+   echo ""
+   kill -9 $TAILPID
+   exit 0
+}
+
+PCOUNT=`/sbin/fuser $OUTPUT_LOG 2>/dev/null | wc -w`
+if [ $PCOUNT -lt 1 ]; then
+   echo ""
+   echo "Domino Server does not appear to be started.  Monitor terminating..."
+   echo ""
+   exit 1
+fi
+
+trap "stop_monitor" 1 2 3
+
+echo ""
+echo "******************************************************************"
+echo "     To exit this monitor enter a DOT(.) "
+echo "******************************************************************"
+echo ""
+
+tail -f $OUTPUT_LOG >> $CURRENT_TTY &
+TAILPID=$!
+
+while [ 1 -eq 1 ]
+do
+  CMD=""
+  OPT=""
+  read CMD OPT
+  case $CMD in
+     "CLEAR") if [[ "$OPT" = "log" || "$OPT" = "LOG" ]]; then
+                 echo "Log cleared on `date`" > $OUTPUT_LOG
+                 echo "" >> $OUTPUT_LOG 
+              fi
+              echo "" >> $INPUT_FILE ;;
+     "exit")  echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "quit")  echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "e")     echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG 
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "q")     echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG 
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "EXIT")  echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "QUIT")  echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG 
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "Q")     echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     "E")     echo "If you want to quit monitor console, enter ." >> $OUTPUT_LOG
+              echo "If you want to EXIT domino server, enter command 'shutdown' " >> $OUTPUT_LOG
+              echo  ">" >> $OUTPUT_LOG ;;
+     ".")break
+              echo "" >> $DOMINO_INPUT ;;       
+     *)       echo $CMD $OPT >> $INPUT_FILE ;;
+   esac
+done
+stop_monitor
+

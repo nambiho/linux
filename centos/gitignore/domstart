@@ -1,0 +1,115 @@
+#!/bin/bash
+# Domino Server Start Script
+# Licenced Materials - Property of IBM
+# (C) COPYRIGHT International Business Machines Corp 1994,1998,2001
+# All Rights Reserved.
+# US Government Users Restricted Rights - Use, duplication or disclosure
+# restricted by GSA ADP Schedule Contract with IBM Corp.
+########################################################################
+# Description -	start_domino
+#
+# This is a server startup script to start the Domino Server in	background
+# that gets command input from a file and pipes	the output to another which
+# can be monitored by administrators by	the start_monitor script.
+#
+# The INPUT file allows	any command to be issued to the	Domino Server so
+# this file should be treated accordingly ...hidden with the appropriate
+# permissions to prevent unauthorized access to	the server
+#
+# Inputs:
+# Outputs:
+# File Mode: -rwxr-xr-x
+# File Owner: domino<N>
+########################################################################
+
+# This script is provided "As Is".
+
+# Set Script Environment variables.
+NOTES_USER=notes				# AIX user id for this server   
+NOTES_PATH=/hdd/ext1/notesdata  		        # Path for server data directory	
+NOTES_SERVER=wing				# Name of Domino Server
+LOTUS_PATH=/opt/hcl/domino 	                # Program folder of server
+OUTPUT_PATH=$NOTES_PATH/log
+OUTPUT_LOG=$OUTPUT_PATH/$NOTES_SERVER.log	# Output file for server console
+INPUT_FILE=$NOTES_PATH/$NOTES_USER.input		# Input file for server console
+
+CURDATE=`date +"%m%d%H%M"`
+PATH=$NOTES_PATH:$LOTUS_PATH/bin:$HOME/bin:$PATH
+
+
+if ((`id -u` != `id -u $NOTES_USER`))
+then
+   print "Please run the Domino Server as the $NOTES_USER user "
+   exit
+fi
+
+#
+
+if [ ! -x $LOTUS_PATH/bin/server ] ; then
+     echo "Cannot access server command - exiting"
+     exit 1
+fi
+
+if [ ! -d $NOTES_PATH ] ; then
+     echo "Cannot access notes data directory - exiting"
+     exit 1
+fi
+
+#NOTES_RUNNING='ps -fu $NOTES_USER | grep domino | grep -v grep '
+#if [[ -n $NOTES_RUNNING ]] ; then
+#     echo "Domino Server is already running - exiting"
+#exit 1
+#fi
+
+cd $NOTES_PATH
+#
+# Clean up if the Domino Server terminated abnormally
+#
+
+rm -f ~notes.lck
+mems=`ipcs | grep $NOTES_USER | awk '{ print $1 $2 }' |  awk -F"m" '{ print $2 }' | awk '{ print $1 }'`
+sems=`ipcs | grep $NOTES_USER | awk '{ print $1 $2 }' |  awk -F"s" '{ print $2 }' | awk '{ print $1 }'`
+for j in $mems;do if [ -n "$j" ] ; then ipcrm -m $j;fi;done
+for j in $sems;do if [ -n "$j" ] ; then ipcrm -s $j;fi;done
+
+#
+# Notesbench environment variables
+#
+# export DEBUGSIGCHILD=1
+# export DEBUG_SHOW_TIMEOUT=1
+#
+# export Notes_SHARED_DPOOLSIZE=40000000   (268435456)
+#
+# For running debug versions of executables
+# export LIBPATH=/lib:/opt/lib:/opt/ibm/lotus/notes/latest/linux
+#
+echo "" > $INPUT_FILE
+#
+# For servers using Notes passwords,
+# replace the previous line with the following two lines.
+
+# for Logging...
+# if [  -e $NOTES_PATH/req*.log ] ; then
+#     echo "... wait 7 seconds to start server... ";
+#     tar -cvf  $NOTES_PATH/reqdir/req.$CURDATE.tar req*.log > /dev/null
+#     sleep 7
+#     rm  $NOTES_PATH/req*.log
+# fi
+
+ if [  -e $NOTES_PATH/domlog.nsf ] ; then
+     mv  $NOTES_PATH/domlog.nsf  $NOTES_PATH/domlog.$CURDATE.nsf
+ fi
+
+#mv  $OUTPUT_LOG  $OUTPUT_LOG.$CURDATE.old
+#-- mv  $OUTPUT_LOG  $OUTPUT_LOG.old
+#mv  /notesdata/notes.input  /notesdata/log/notes.input.$CURDATE
+#cat $NOTES_PATH/.secure_hidden_passwd > $INPUT_FILE
+echo " " > $INPUT_FILE
+echo "show server" >> $INPUT_FILE
+echo "Starting Domino for linux ($NOTES_SERVER)..."
+
+if [ ! -d $OUTPUT_PATH ] ; then
+     mkdir $OUTPUT_PATH
+fi
+
+nohup $LOTUS_PATH/bin/server < $INPUT_FILE > $OUTPUT_LOG 2>&1 &
