@@ -182,3 +182,4 @@ $ nohup java -jar test.jar 1>/dev/null 2>&1 &
 $ ps -ef | grep java
 $ kill -9 [java pid]
 ```
+
