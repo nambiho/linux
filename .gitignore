@@ -6,4 +6,4 @@ ubuntu.config.md
 .DS_Store
 
 # dir
-gitignore/
+/gitignore
