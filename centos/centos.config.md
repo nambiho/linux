@@ -86,6 +86,7 @@ $ yum install git
 ~~~
 
 # nginx
+- [reference](https://gonna-be.tistory.com/20)
 ~~~
 $ yum install epel-release
 $ yum update
@@ -115,6 +116,14 @@ $ ln -s /usr/local/openssl/include/openssl /usr/include/openssl
 $ ln -s /usr/local/openssl/lib64/libssl.so.3 /usr/lib64/libssl.so.3
 $ ln -s /usr/local/openssl/lib64/libcrypto.so.3 /usr/lib64/libcrypto.so.3
 ~~~
+
+
+# https
+- [reference](https://hoing.io/archives/11906)
+```
+$ cd /etc/nginx/conf.d
+$ openssl dhparam -out ssl-dhparams.pem 4096
+```
 
 
 # mysql
@@ -203,7 +212,7 @@ $ ps -ef | grep java
 $ kill -9 [java pid]
 ```
 
-# secure commands
+# log commands
 ```
 $ tail -f /var/log/secure
 $ last -f /var/log/btmp | more
