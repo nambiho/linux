@@ -16,9 +16,29 @@ $ firewall-cmd --permanent --zone=public --add-port=8080/tcp
 $ firewall-cmd --permanent --zone=public --add-port=9000/tcp
 $ firewall-cmd --permanent --zone=public --add-port=3306/tcp
 $ firewall-cmd --permanent --zone=public --add-port=8585/tcp
+$ firewall-cmd --permanent --zone=public --add-port=30033/tcp
 $ firewall-cmd --reload
 $ firewall-cmd --list-all
 ~~~
+
+# ssh & fail2ban
+```
+$ yum update
+$ yum -y install fail2ban
+$ systemctl enable fail2ban
+$ systemctl start fail2ban
+$ tail -f /var/log/fail2ban.log
+$ fail2ban-client status
+$ vi /etc/ssh/sshd_config
+    Port=30033
+
+$ semanage port -a -t ssh_port_t -p tcp 30033
+$ systemctl stop sshd
+$ systemctl start sshd
+
+# release ip
+$ fail2ban-client set sshd unbanip xxx.xxx.xxx.xxx
+```
 
 # Domino Server
 ~~~
@@ -183,3 +203,10 @@ $ ps -ef | grep java
 $ kill -9 [java pid]
 ```
 
+# secure commands
+```
+$ tail -f /var/log/secure
+$ last -f /var/log/btmp | more
+$ last -f /var/log/wtmp
+$ tail -f /var/log/fail2ban.log
+```
