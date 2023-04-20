@@ -118,11 +118,13 @@ $ ln -s /usr/local/openssl/lib64/libcrypto.so.3 /usr/lib64/libcrypto.so.3
 ~~~
 
 
-# https
+# let's encrypt
 - [reference](https://hoing.io/archives/11906)
 ```
 $ cd /etc/nginx/conf.d
 $ openssl dhparam -out ssl-dhparams.pem 4096
+$ yum -y install epel-release yum-utils
+$ yum install certbot certbot-nginx
 ```
 
 
