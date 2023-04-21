@@ -29,6 +29,7 @@ $ systemctl enable fail2ban
 $ systemctl start fail2ban
 $ tail -f /var/log/fail2ban.log
 $ fail2ban-client status
+
 $ vi /etc/ssh/sshd_config
     Port=30033
 
@@ -58,8 +59,8 @@ $ vi /etc/security/limits.conf
 
 $ ./install
 $ adduser notes -p password
-$ addgroup notes
-$ usermod -a -G notes notes
+#$ groupadd notes
+#$ usermod -a -G notes notes
 $ cd /tmp/domino/langpack
 $ ./LNXDomLP -i silent -DSILENT_INI_PATH="/hdd/ext1/notesdata/LPSilent.ini"
 $ cd /opt/hcl/domino/bin
@@ -71,12 +72,29 @@ $ ./server -listen
 $ ./server
 ~~~
 
-# Nodejs
+# nodejs
 ~~~
+# nvm local
 $ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 $ . ~/.bashrc
 $ nvm install node
 $ node --version
+
+
+# global
+$ yum update
+$ yum install http://opensource.wandisco.com/centos/7/git/x86_64/wandisco-git-release-7-1.noarch.rpm
+$ yum -y install nodejs npm
+$ node --version
+$ npm --version
+$ npm i -g npm@9.6.5
+$ npm i -g n
+$ n v16.20.0
+    installing : node-v16.20.0
+    mkdir : /usr/local/n/versions/node/16.20.0
+    fetch : https://nodejs.org/dist/v16.20.0/node-v16.20.0-linux-x64.tar.xz
+    copying : node/16.20.0
+    installed : v16.20.0 (with npm 8.19.4)
 ~~~
 
 # git
