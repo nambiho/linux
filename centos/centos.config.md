@@ -101,7 +101,22 @@ $ n v16.20.0
 ~~~
 $ yum remove git
 $ yum install git
+
+$ cd node
+$ mkdir miraean.git
+$ git init --bare miraean.git
 ~~~
+
+#### local pc
+```
+$ ssh-keygen -t rsa -b 4096 -C "nodev@xxx.xxx.xxx.xxx"
+    Enter file in which to save the key (/Users/nambiho/.ssh/id_rsa): nodev_id_rsa
+    .....
+
+$ ssh-copy-id -i nodev_id_rsa -p 30033 nodev@xxx.xxx.xxx.xxx
+$ git clone ssh://nodev@xxx.xxx.xxx.xxx:/hdd/ext1/node/miraean.git
+```
+
 
 # nginx
 - [reference](https://gonna-be.tistory.com/20)
