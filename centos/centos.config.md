@@ -127,6 +127,9 @@ $ yum install -y nginx
 $ nginx -version
 $ vi /etc/nginx/conf.d/default.conf
 $ systemctl start nginx
+
+# root directory
+$ semanage fcontext -a -t httpd_sys_content_t [object]
 ~~~
 
 # openssl
