@@ -200,6 +200,23 @@ $ semanage fcontext -l | grep mysql
 $ semanage fcontext -a -t mysqld_db_t "/hdd/ext1/mysql(/.*)?"
 $ restorecon -R /hdd/ext1/mysql
 $ systemctl start mysqld
+
+$ mysql -u root -p
+
+mysql> show variables like "general_log%";
+
+    +------------------+-----------------------------+
+    | Variable_name    | Value                       |
+    +------------------+-----------------------------+
+    | general_log      | OFF                         |
+    | general_log_file | /hdd/ext1/mysql/local.log   |
+    +------------------+-----------------------------+
+    2 rows in set (0.01 sec)
+
+mysql> set global general_log='ON';
+mysql> exit
+
+$ tail -f /hdd/ext1/mysql/local.log
 ~~~
 
 # docker
