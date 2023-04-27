@@ -217,7 +217,6 @@ mysql> set global general_log='ON';
 mysql> exit
 
 $ tail -f /hdd/ext1/mysql/local.log
-
 ~~~
 
 # docker
