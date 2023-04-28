@@ -8,6 +8,8 @@
 $ yum update
 ```
 
+
+
 # firewall
 ~~~
 $ firewall-cmd --permanent --zone=public --add-port=80/tcp
@@ -20,6 +22,9 @@ $ firewall-cmd --permanent --zone=public --add-port=30033/tcp
 $ firewall-cmd --reload
 $ firewall-cmd --list-all
 ~~~
+
+
+
 
 # ssh & fail2ban
 ```
@@ -40,6 +45,9 @@ $ systemctl start sshd
 # release ip
 $ fail2ban-client set sshd unbanip xxx.xxx.xxx.xxx
 ```
+
+
+
 
 # Domino Server
 ~~~
@@ -72,6 +80,9 @@ $ ./server -listen
 $ ./server
 ~~~
 
+
+
+
 # nodejs
 ~~~
 # nvm local
@@ -97,6 +108,9 @@ $ n v16.20.0
     installed : v16.20.0 (with npm 8.19.4)
 ~~~
 
+
+
+
 # git
 ~~~
 $ yum remove git
@@ -118,6 +132,8 @@ $ git clone ssh://nodev@xxx.xxx.xxx.xxx:/hdd/ext1/node/miraean.git
 ```
 
 
+
+
 # nginx
 - [reference](https://gonna-be.tistory.com/20)
 ~~~
@@ -131,6 +147,9 @@ $ systemctl start nginx
 # root directory
 $ semanage fcontext -a -t httpd_sys_content_t [object]
 ~~~
+
+
+
 
 # openssl
 ~~~
@@ -154,6 +173,8 @@ $ ln -s /usr/local/openssl/lib64/libcrypto.so.3 /usr/lib64/libcrypto.so.3
 ~~~
 
 
+
+
 # let's encrypt
 - [reference](https://hoing.io/archives/11906)
 ```
@@ -162,6 +183,8 @@ $ openssl dhparam -out ssl-dhparams.pem 4096
 $ yum -y install epel-release yum-utils
 $ yum install certbot certbot-nginx
 ```
+
+
 
 
 # mysql
@@ -191,7 +214,8 @@ $ vi my.cnf
 
     datadir=/hdd/ext1/mysql/
     socket=/hdd/ext1/mysql/mysql.sock
-
+    skip-name-resolve=on
+    
     [client]
     socket=/hdd/ext1/mysql/mysql.sock
 
@@ -219,6 +243,9 @@ mysql> exit
 $ tail -f /hdd/ext1/mysql/local.log
 ~~~
 
+
+
+
 # docker
 - [page](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-centos-7)
 ~~~
@@ -228,13 +255,21 @@ $ docker version
 $ systemctl start docker
 ~~~
 
+
+
+
 # vault
 - [page](https://blog.naver.com/PostView.nhn?blogId=wideeyed&logNo=222084349160)
+- [page](https://www.joinc.co.kr/w/man/12/vault)
+- [page] (https://blog.outsider.ne.kr/1266)
 ```
 $ yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
 $ yum -y install vault
 $ vault version
 ```
+
+
+
 
 # mongodb
 - [page](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-red-hat/)
@@ -253,6 +288,30 @@ $ yum -y install mongodb-org
 $ systemctl start mongod
 ```
 
+
+
+# Redis
+```
+$ yum -y install redis
+$ cd /etc
+$ vi redis.conf
+    bind 0.0.0.0
+    port 60006
+    requirepass [password]
+
+$ systemctl start redis
+$ systemctl enable redis
+$ redis-cli -p 60006
+
+127.0.0.1:60006> AUTH [password]
+OK
+127.0.0.1:60006> ping
+PONG
+127.0.0.1:60006> exit
+```
+
+
+
 # java
 ```
 $ cd /hdd/ext1/jar
@@ -266,6 +325,9 @@ $ nohup java -jar test.jar 1>/dev/null 2>&1 &
 $ ps -ef | grep java
 $ kill -9 [java pid]
 ```
+
+
+
 
 # log commands
 ```
