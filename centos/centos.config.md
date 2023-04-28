@@ -261,7 +261,7 @@ $ systemctl start docker
 # vault
 - [page](https://blog.naver.com/PostView.nhn?blogId=wideeyed&logNo=222084349160)
 - [page](https://www.joinc.co.kr/w/man/12/vault)
-- [page] (https://blog.outsider.ne.kr/1266)
+- [page](https://blog.outsider.ne.kr/1266)
 ```
 $ yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
 $ yum -y install vault
