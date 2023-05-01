@@ -35,6 +35,11 @@ $ systemctl start fail2ban
 $ tail -f /var/log/fail2ban.log
 $ fail2ban-client status
 
+$ vi /etc/fail2ban/jail.conf
+    [sshd]
+    enabled=true
+    maxretry=5
+
 $ vi /etc/ssh/sshd_config
     Port=30033
 
