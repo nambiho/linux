@@ -71,7 +71,7 @@ $ vi /etc/security/limits.conf
     root   hard    nofile  60000
 
 $ ./install
-$ adduser notes -p password
+$ adduser notes -p [user password]
 #$ groupadd notes
 #$ usermod -a -G notes notes
 $ cd /tmp/domino/langpack
@@ -83,6 +83,13 @@ $ ./server -listen
     # remote setting
 
 $ ./server
+
+
+# auth run on reboot
+$ cd /etc/rc.d
+$ vi rc.local
+    su - notes -c "domstart"
+$ chmod +x rc.local
 ~~~
 
 
@@ -128,12 +135,12 @@ $ git init --bare miraean.git
 
 #### local pc
 ```
-$ ssh-keygen -t rsa -b 4096 -C "nodev@xxx.xxx.xxx.xxx"
-    Enter file in which to save the key (/Users/nambiho/.ssh/id_rsa): nodev_id_rsa
+$ ssh-keygen -t rsa -b 4096 -C "[userid]@xxx.xxx.xxx.xxx"
+    Enter file in which to save the key (/Users/nambiho/.ssh/id_rsa): [userid]_id_rsa
     .....
 
-$ ssh-copy-id -i nodev_id_rsa -p 30033 nodev@xxx.xxx.xxx.xxx
-$ git clone ssh://nodev@xxx.xxx.xxx.xxx:/hdd/ext1/node/miraean.git
+$ ssh-copy-id -i [userid]_id_rsa -p 30033 [userid]@xxx.xxx.xxx.xxx
+$ git clone ssh://[userid]@xxx.xxx.xxx.xxx:/hdd/ext1/node/miraean.git
 ```
 
 
