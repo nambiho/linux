@@ -9,6 +9,34 @@ $ yum update
 ```
 
 
+# kernel
+- [elrepo](http://elrepo.org/tiki/HomePage)
+- [page](https://cjwoov.tistory.com/48)
+```
+$ uname -msr
+$ cat /etc/redhat-release
+$ cat /etc/os-release 
+$ yum update
+$ rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+$ yum install https://www.elrepo.org/elrepo-release-7.el7.elrepo.noarch.rpm
+$ yum --enablerepo=elrepo-kernel install kernel-ml kernel-ml-devel
+$ grep ^menuentry /boot/grub2/grub.cfg | cut -d "'" -f2
+
+    CentOS Linux (6.3.2-1.el7.elrepo.x86_64) 7 (Core)
+    CentOS Linux (3.10.0-1160.90.1.el7.x86_64) 7 (Core)
+    CentOS Linux (3.10.0-1160.88.1.el7.x86_64) 7 (Core)
+    CentOS Linux (3.10.0-1160.el7.x86_64) 7 (Core)
+    CentOS Linux (0-rescue-c37853261cfe4f249ab9a8d5906759f7) 7 (Core)
+
+$ grub2-set-default "CentOS Linux (6.3.2-1.el7.elrepo.x86_64) 7"
+$ grub2-editenv list
+$ reboot
+$ yum -y install yum-utils
+
+# count=* is option.
+$ package-cleanup --oldkernels --count=2
+```
+
 
 # firewall
 ~~~
