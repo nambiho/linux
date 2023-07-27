@@ -96,12 +96,12 @@ $ vi /etc/security/limits.conf
     *       hard    nofile  60000
     *       soft    nofile  60000
     root   hard    nofile  60000
-    root   hard    nofile  60000
+    root   soft    nofile  60000
 
-$ ./install
 $ adduser notes -p [user password]
 #$ groupadd notes
 #$ usermod -a -G notes notes
+$ ./install
 $ cd /tmp/domino/langpack
 $ ./LNXDomLP -i silent -DSILENT_INI_PATH="/hdd/ext1/notesdata/LPSilent.ini"
 $ cd /opt/hcl/domino/bin
@@ -186,6 +186,7 @@ $ systemctl start nginx
 
 # root directory
 $ semanage fcontext -a -t httpd_sys_content_t [object]
+$ chcon -R -t httpd_sys_content_t [directory]
 ~~~
 
 
@@ -352,7 +353,7 @@ PONG
 
 
 
-# java
+# run java application
 - [oauth](https://velog.io/@rnqhstlr2297/Spring-Security-OAuth2-%EC%86%8C%EC%85%9C%EB%A1%9C%EA%B7%B8%EC%9D%B8)
 ```
 $ cd /hdd/ext1/jar
@@ -377,3 +378,53 @@ $ last -f /var/log/btmp | more
 $ last -f /var/log/wtmp
 $ tail -f /var/log/fail2ban.log
 ```
+
+
+# gitea server
+- [Reference](https://docs.gitea.com/next/installation/database-prep)
+```
+$ mysql -u root -p
+
+mysql> SET old_passwords=0;
+mysql> create user 'gitea' identified by 'gitea';
+mysql> create user 'gitea'@'%' identified by 'gitea';
+mysql> create database giteadb character set 'utf8mb4' collate 'utf8mb4_unicode_ci';
+Query OK, 1 row affected (0.01 sec)
+
+mysql> grant all privileges on giteadb.* to 'gitea';
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> grant all privileges on giteadb.* to 'gitea'@'localhost';
+Query OK, 0 rows affected, 1 warning (0.01 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> exit
+Bye
+
+$ wget -O gitea https://dl.gitea.com/gitea/1.19.4/gitea-1.19.4-linux-amd64
+$ groupadd --system git
+$ adduser --system --shell /bin/bash --comment 'Git Version Control' --gid git --home-dir /home/git --create-home git
+$ mkdir -p /var/lib/gitea/{custom,data,indexers,public,log}
+$ chown -R git:git /var/lib/gitea/
+$ chmod -R 750 /var/lib/gitea/
+$ mkdir /etc/gitea
+$ chown root:git /etc/gitea
+$ chmod 770 /etc/gitea
+$ cp gitea /usr/local/bin/gitea
+$ touch /etc/systemd/system/gitea.service
+$ vi /etc/systemd/system/gitea.service
+    ## [Copy & Paste](https://github.com/go-gitea/gitea/blob/main/contrib/systemd/gitea.service)
+
+```
+
+- http://[ip]:3000
+- 설정
+    git.hsmirae.com
+    3003
+    gitadmin / gitadmin!
+
