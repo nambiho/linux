@@ -428,3 +428,30 @@ $ vi /etc/systemd/system/gitea.service
     3003
     gitadmin / gitadmin!
 
+
+
+# jenkins
+- [Reference](https://www.jenkins.io/doc/book/installing/linux/#red-hat-centos)
+~~~
+$ wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+$ rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+$ yum install jenkins
+$ systemctl enable jenkins
+$ vi /usr/lib/systemd/system/jenkins.service
+
+    Environment="JENKINS_PORT=8800"
+
+$ systemctl daemon-reload
+$ systemctl start jenkins
+$ firewall-cmd --permanent --zone-add=public --add-port=8800/tcp
+$ firewall-cmd --reload
+~~~
+
+- Browser (localhost:8800)
+~~~
+$ cat /var/lib/jenkins/secrets/initialAdminPassword
+~~~
+- input administrator password
+
+
+
