@@ -237,3 +237,8 @@ $ ./server -listen
 
 $ ./server
 ~~~
+
+# Domino REST API
+~~~
+# 
+~~~

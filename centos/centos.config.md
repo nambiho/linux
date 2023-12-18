@@ -121,6 +121,33 @@ $ chmod +x rc.local
 ~~~
 
 
+# Domino REST API
+[Reference](https://opensource.hcltechsw.com/Domino-rest-api/tutorial/quickstart.html)
+[opensource](https://opensource.hcltechsw.com/howto/database/enablingadb.html)
+[uninstall](https://opensource.hcltechsw.com/Domino-rest-api/howto/install/uninstall.html)
+~~~
+$ tar -xvzf ./Domino_REST_API_12_tar.gz -C ./Domino_REST_API
+$ cd Domino_REST_API
+$ java -jar ./restapiInstall-r12.jar -d="/hdd/ext1/notesdata" -i="/hdd/ext1/notesdata/notes.ini" -r="/opt/hcl/restapi" -p="/opt/hcl/domino/notes/latest/linux" -a
+$ firewall-cmd --permanent --zone=public --add-port=8880/tcp
+$ firewall-cmd --permanent --zone=public --add-port=8886/tcp
+$ firewall-cmd --permanent --zone=public --add-port=8889/tcp
+$ firewall-cmd --permanent --zone=public --add-port=8890/tcp
+$ firewall-cmd --reload
+$ firewall-cmd --list-all
+~~~
+
+### Open Notes Client
+- names.nsf > select Server document
+- Security tab
+- select member for "Create databases $ templates" item
+- save document
+- restart server
+
+### Connect to "http://server-url: 8880" on browser
+- http://url:8880 접속
+
+
 
 
 # nodejs
