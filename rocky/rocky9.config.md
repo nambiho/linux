@@ -120,6 +120,46 @@ $ node -v
 $ dnf -y install git
 ~~~
 
+# gitea
+[ref](https://docs.gitea.com/installation/install-from-binary)
+~~~
+$ cd /data/source
+$ mkdir gitea
+$ cd gitea
+$ wget -O gitea https://dl.gitea.com/gitea/1.21.2/gitea-1.21.2-linux-amd64
+$ chmod +x gitea
+$ groupadd --system git
+$ adduser --system --shell /bin/bash --comment 'Git Version Control' --gid git --home-dir /home/git --create-home git
+$ mkdir -p /var/lib/gitea/{custom,data,log}
+$ chown -R git:git /var/lib/gitea/
+$ chmod -R 750 /var/lib/gitea/
+$ mkdir /etc/gitea
+$ chown root:git /etc/gitea
+$ chmod 770 /etc/gitea
+$ vi ~/.bash_profile
+    GITEA_WORK_DIR=/var/lib/gitea/
+    export GITEA_WORK_DIR
+$ . ~/.bash_profile
+$ cp gitea /usr/local/bin/gitea
+$ touch /usr/lib/systemd/system/gitea.service
+    [copy & paste] https://github.com/go-gitea/gitea/blob/release/v1.21/contrib/systemd/gitea.service
+$ systemctl status gitea
+$ systemctl enable gitea
+$ systemctl start gitea
+~~~
+- http://[server ip]:3000
+- environment gitea & save
+- changed work directory from "/var/lib/gitea" to "/data/gitea"
+### config gitea.hsmirae.com
+~~~
+$ semanage permissive -a httpd_t
+$ cd /etc/nginx/conf.d
+$ vi gitea.hsmirae.com.conf
+$ systemctl stop nginx
+$ systemctl start nginx
+~~~
+
+
 # nginx
 [ref](https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-rocky-linux-8)
 ~~~
@@ -213,6 +253,12 @@ $ mysql_secure_installation
 
     All done! 
 
+$ mysql -u root
+
+mysql> alter user 'root'@'localhost' identified with mysql_native_password by '1234';
+mysql> create user 'root'@'%' identified by '1234';
+mysql> grant all on *.* to 'root'@'%' with grant option;
+mysql> flush privileges;
 ~~~
 
 # Domino
@@ -231,7 +277,8 @@ $ tar -xvf Domino.tar
 $ cd Domino
 $ adduser notes -p [user password]
 $ ./install
-$ ./server -listen
+$ cd /data/notesdata
+$ /opt/hcl/domino/bin/server -listen
 
     # remote setting
 
@@ -239,6 +286,47 @@ $ ./server
 ~~~
 
 # Domino REST API
+[Reference](https://opensource.hcltechsw.com/Domino-rest-api/tutorial/quickstart.html)
+[opensource](https://opensource.hcltechsw.com/howto/database/enablingadb.html)
+[uninstall](https://opensource.hcltechsw.com/Domino-rest-api/howto/install/uninstall.html)
 ~~~
-# 
+$ tar -xvzf ./Domino_REST_API_14_tar.gz -C ./restapi
+$ cd restapi
+$ java -jar ./restapiInstall-r12.jar -d="/data/notesdata" -i="/data/notesdata/notes.ini" -r="/opt/hcl/restapi" -p="/opt/hcl/domino/notes/latest/linux" -a
+$ firewall-cmd --permanent --zone=public --add-port=8880/tcp
+$ firewall-cmd --permanent --zone=public --add-port=8886/tcp
+$ firewall-cmd --permanent --zone=public --add-port=8889/tcp
+$ firewall-cmd --permanent --zone=public --add-port=8890/tcp
+$ firewall-cmd --reload
+$ firewall-cmd --list-all
 ~~~
+
+### Open Notes Client
+- names.nsf > select Server document
+- Security tab
+- select member for "Create databases $ templates" item
+- save document
+- restart server
+
+### Connect to "http://server-url: 8880" on browser
+- http://url:8880 접속
+
+
+# Jenkins
+[Ref 1](https://www.linuxbuzz.com/install-jenkins-on-rhel-rockylinux-almalinux/)
+[Ref 2](https://www.howtoforge.com/how-to-install-jenkins-on-rocky-linux-9/)
+~~~
+$ wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+$ rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+$ dnf -y install jenkins
+$ systemctl daemon-reload
+$ systemctl enable jenkins
+$ firewall-cmd --permanent --zone=public --add-port=8800/tcp
+$ firewall-cmd --reload
+$ firewall-cmd --list-all
+$ systemctl start jenkins
+$ cat /var/lib/jenkins/secrets/initialAdminPassword
+~~~
+- open http://[server]:8800
+- config jenkins
+
