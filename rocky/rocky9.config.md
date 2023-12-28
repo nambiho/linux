@@ -283,6 +283,11 @@ $ /opt/hcl/domino/bin/server -listen
     # remote setting
 
 $ ./server
+
+$ cd /etc/rc.d
+$ vi rc.local
+    su - notes -c "domstart"
+$ chmod +x rc.local
 ~~~
 
 # Domino REST API
@@ -321,12 +326,12 @@ $ rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
 $ dnf -y install jenkins
 $ systemctl daemon-reload
 $ systemctl enable jenkins
-$ firewall-cmd --permanent --zone=public --add-port=8800/tcp
+$ firewall-cmd --permanent --zone=public --add-port=50000/tcp
 $ firewall-cmd --reload
 $ firewall-cmd --list-all
 $ systemctl start jenkins
 $ cat /var/lib/jenkins/secrets/initialAdminPassword
 ~~~
-- open http://[server]:8800
+- open http://[server]:50000
 - config jenkins
 

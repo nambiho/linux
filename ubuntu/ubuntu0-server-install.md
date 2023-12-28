@@ -143,6 +143,8 @@ $ sudo snap install --classic certbot
 $ sudo ln -s /snap/bin/certbot /usr/bin/certbot
 $ sudo ufw allow 443
 $ sudo certbot certonly --standalone -d miraean.site
+
+$ tail -f /var/log/letsencrypt/letsencrypt.log
 ~~~
 
 
