@@ -76,6 +76,7 @@ $ usermod -aG docker $(whoami)
 # Mongodb
 [ref 1](https://idroot.us/install-mongodb-rocky-linux-9/)
 [ref 2](https://ko.linux-console.net/?p=4100#gsc.tab=0)
+[ref 3](https://github.com/mongodb/mongodb-selinux)
 ~~~
 $ cd /etc/yum.repo.d
 $ vi mongodb-org-6.0.repo
