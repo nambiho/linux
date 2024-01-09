@@ -273,12 +273,17 @@ $ vi limits.conf
     root   hard    nofile  60000
     root   soft    nofile  60000
 
-$ cd /data/source/domino/domino12
+$ cd /data/source/domino/domino14
 $ tar -xvf Domino.tar
-$ cd Domino
+$ cd linux64
 $ adduser notes -p [user password]
 $ ./install
 $ cd /data/notesdata
+
+$ firewall-cmd --permanent --zone=public --add-port=3003/tcp
+$ firewall-cmd --reload
+$ firewall-cmd --list-all
+
 $ /opt/hcl/domino/bin/server -listen
 
     # remote setting
@@ -298,7 +303,7 @@ $ chmod +x rc.local
 ~~~
 $ tar -xvzf ./Domino_REST_API_14_tar.gz -C ./restapi
 $ cd restapi
-$ java -jar ./restapiInstall-r12.jar -d="/data/notesdata" -i="/data/notesdata/notes.ini" -r="/opt/hcl/restapi" -p="/opt/hcl/domino/notes/latest/linux" -a
+$ java -jar ./restapiInstall-r14.jar -d="/data/notesdata" -i="/data/notesdata/notes.ini" -r="/opt/hcl/restapi" -p="/opt/hcl/domino/notes/latest/linux" -a
 $ firewall-cmd --permanent --zone=public --add-port=8880/tcp
 $ firewall-cmd --permanent --zone=public --add-port=8886/tcp
 $ firewall-cmd --permanent --zone=public --add-port=8889/tcp
