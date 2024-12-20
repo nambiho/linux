@@ -341,3 +341,27 @@ $ cat /var/lib/jenkins/secrets/initialAdminPassword
 - open http://[server]:50000
 - config jenkins
 
+
+# Python
+### python3.11.11
+~~~
+$ dnf install python3.11 -y
+~~~
+### alternatives
+~~~
+$ alternatives --install /usr/bin/python python /usr/bin/python3.9 1
+$ alternatives --install /usr/bin/python python /usr/bin/python3.11 2
+$ alternatives --config python
+~~~
+### pip3.11
+~~~
+$ dnf install python3.11-pip
+~~~
+### pip for user
+~~~
+$ dnf remove python3.11-pip
+$ cd /data/source/python
+$ wget https://bootstrap.pypa.io/get-pip.py
+$ python3 get-pip.py --user
+~~~
+
