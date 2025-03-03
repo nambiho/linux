@@ -64,6 +64,7 @@ $ systemctl start fail2ban
 [ref 3](https://ko.linux-console.net/?p=6553#gsc.tab=0)
 ~~~
 $ dnf check-update
+$ dnf -y remove podman containers-common
 $ dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
 $ dnf -y install docker-ce docker-ce-cli containerd.io
 $ systemctl start docker
@@ -346,6 +347,7 @@ $ cat /var/lib/jenkins/secrets/initialAdminPassword
 ### python3.11.11
 ~~~
 $ dnf install python3.11 -y
+$ python
 ~~~
 ### alternatives
 ~~~
