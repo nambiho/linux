@@ -318,6 +318,45 @@ $ vi rc.local
 $ chmod +x rc.local
 ~~~
 
+### domino command script
+[ref 1](https://nashcom.github.io/domino-startscript/startscript/quickstart/)
+[ref 2](https://www.nashcom.de/nshweb/pages/startscript.htm)
+~~~
+$ cd /src/domino
+$ mkdir script
+$ cd script
+$ git clone https://github.com/nashcom/domino-startscript.git
+$ cd domino-startscript
+
+	(replace DOMINO_DATA_PATH in DominoOneTouchSetup.sh, entrypoint.sh, install_script, rc_domino_script)
+
+$ ./install_script
+
+======== ./sysconfig/rc_domino_config
+
+Installing StartScript & Config
+
+[/usr/bin/domino] installed
+[/opt/nashcom/startscript/rc_domino_script] installed
+[/opt/nashcom/startscript/rc_domino_readme.txt] installed
+[/opt/nashcom/startscript/nshinfo.sh] installed
+[/opt/nashcom/startscript/DominoOneTouchSetup.sh] installed
+[/opt/nashcom/startscript/nshcfg.sh] installed
+[/opt/nashcom/startscript/domino-example.cfg] installed
+[/opt/nashcom/startscript/rc_domino_config_4.0.2.txt] installed
+[/etc/sysconfig/rc_domino_config] installed
+[/data1/hcl/notesdata/systemdbs.ind] installed
+[/etc/sysconfig/domino.cfg] installed
+[/etc/systemd/system/domino.service] installed
+
+Enabling Service
+Created symlink /etc/systemd/system/multi-user.target.wants/domino.service → /etc/systemd/system/domino.service.
+
+
+Done
+
+~~~
+
 # Domino REST API
 [Reference](https://opensource.hcltechsw.com/Domino-rest-api/tutorial/quickstart.html)
 [opensource](https://opensource.hcltechsw.com/howto/database/enablingadb.html)
