@@ -116,6 +116,17 @@ $ dnf -y install nodejs
 $ node -v
 ~~~
 
+[ref](https://forums.rockylinux.org/t/install-npm-and-nodejs/5974/2)
+~~~
+$ dnf module list nodejs
+$ dnf module install nodejs:18
+~~~
+### change version
+~~~
+$ dnf module reset nodejs
+$ dnf module install nodejs:20
+~~~
+
 # git
 [ref](https://www.linuxcapable.com/how-to-install-git-on-rocky-linux/)
 ~~~
