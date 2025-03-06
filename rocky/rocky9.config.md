@@ -38,6 +38,16 @@ $ rpm --checksig ~~.rpm
 [rpm](https://ko.linux-console.net/?p=857#gsc.tab=0)
 
 
+# ftp
+~~~
+$ dnf -y install vsftpd
+$ systemctl enabled vsftpd
+$ systemctl restart vsftpd
+$ firewall-cmd --permanent --zone=public --add-service=ftp
+$ firewall-cmd --reload
+$ firewall-cmd --list-all
+~~~
+
 # fail2ban
 [ref 1](https://ko.linux-console.net/?p=6629#gsc.tab=0)
 [ref 2](https://idroot.us/install-fail2ban-rocky-linux-9/)
