@@ -187,7 +187,21 @@ $ systemctl start nginx
 [ref](https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-rocky-linux-8)
 ~~~
 $ dnf -y install nginx
+$ firewall-cmd --zone=public --permanent --add-server=http
+$ firewall-cmd --zone=public --permanent --add-server=https
+$ firewall-cmd --reload
+$ systemctl start nginx
+$ systelctl enable nginx
 ~~~
+
+
+# letsencrypt
+~~~
+$ dnf install -y certbot python3-certbot-nginx
+$ certbot --nginx -d hsmirae.com
+$ 0 */12 * * * root test -x /usr/bin/certbot -a \! -d /run/systemd/system && perl -e 'sleep int(rand(43200))' && certbot -q renew
+~~~
+
 
 # mysql
 [ref 1](https://wiki.crowncloud.net/?How_to_Install_MySQL_on_Rocky_Linux_9)
