@@ -37,6 +37,12 @@ $ rpm --checksig ~~.rpm
 [rpm](https://www.lesstif.com/system-admin/rpm-command-7635004.html)
 [rpm](https://ko.linux-console.net/?p=857#gsc.tab=0)
 
+# firewalld
+~~~
+$ dnf install -y firewalld
+$ systemctl start firewalld
+$ systemctl enable firewalld
+~~~
 
 # ftp
 ~~~
@@ -184,7 +190,7 @@ $ systemctl start nginx
 
 
 # nginx
-[ref](https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-rocky-linux-8)
+[ref 1](https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-rocky-linux-8)
 ~~~
 $ dnf -y install nginx
 $ firewall-cmd --zone=public --permanent --add-server=http
@@ -192,6 +198,31 @@ $ firewall-cmd --zone=public --permanent --add-server=https
 $ firewall-cmd --reload
 $ systemctl start nginx
 $ systelctl enable nginx
+~~~
+
+[ref 2](https://nginx.org/en/linux_packages.html#RHEL)
+~~~
+$ cd /etc/yum.repos.d
+$ vi nginx.repo
+
+	[nginx-stable]
+	name=nginx stable repo
+	baseurl=http://nginx.org/packages/centos/$releasever/$basearch/
+	gpgcheck=1
+	enabled=1
+	gpgkey=https://nginx.org/keys/nginx_signing.key
+	module_hotfixes=true
+
+	[nginx-mainline]
+	name=nginx mainline repo
+	baseurl=http://nginx.org/packages/mainline/centos/$releasever/$basearch/
+	gpgcheck=1
+	enabled=0
+	gpgkey=https://nginx.org/keys/nginx_signing.key
+	module_hotfixes=true
+
+$ dnf config-manager --enable nginx-mainline
+$ dnf install -y nginx
 ~~~
 
 
@@ -441,3 +472,49 @@ $ wget https://bootstrap.pypa.io/get-pip.py
 $ python3 get-pip.py --user
 ~~~
 
+# redis
+[ref 1](https://blog.naver.com/ncloud24/223571794799)
+~~~
+$ dnf module list redis
+$ dnf module enable redis:7
+$ dnf install -y redis
+~~~
+---
+> OR
+~~~
+$ dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+$ dnf module list redis
+$ dnf module enable redis:remi-7.2 -y
+$ dnf install -y redis
+~~~
+---
+> AND
+~~~
+$ firewall-cmd --permanent --new-zone=redis
+$ firewall-cmd --permanent --zone=redis --add-port=6379/tcp
+$ firewall-cmd --permanent --zone=redis --add-source=127.0.0.1
+$ firewall-cmd --reload
+$ firewall-cmd --info-zone=redis
+$ systemctl start redis
+$ systemctl enable redis
+$ vi /etc/redis/redis.conf
+	requirepass {memory password or change password}
+$ redis-cli
+127.0.0.1:6379> auth {password}
+OK
+127.0.0.1:6379> ping
+PONG
+127.0.0.1:6379> exit
+~~~
+
+# PostgreSQL
+[ref 1](https://www.postgresql.org/download/linux/redhat/#yum)
+~~~
+$ dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+$ dnf -qy module disable postgresql
+$ dnf install -y postgresql17-server
+$ /usr/pgsql-17/bin/postgresql-17-setup initdb
+$ systemctl enable postgresql-17
+$ systemctl start postgresql-17
+$ sudo -u postgres psql
+~~~
