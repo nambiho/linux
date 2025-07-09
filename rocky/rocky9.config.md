@@ -232,6 +232,11 @@ $ dnf install -y certbot python3-certbot-nginx
 $ certbot --nginx -d hsmirae.com
 $ 0 */12 * * * root test -x /usr/bin/certbot -a \! -d /run/systemd/system && perl -e 'sleep int(rand(43200))' && certbot -q renew
 ~~~
+---
+* certonly : user configures
+~~~
+$ certbot certonly -d hsmirae.com -d ex.hsmirae.com
+~~~
 
 
 # mysql
