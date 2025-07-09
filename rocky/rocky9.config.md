@@ -514,7 +514,20 @@ $ dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86
 $ dnf -qy module disable postgresql
 $ dnf install -y postgresql17-server
 $ /usr/pgsql-17/bin/postgresql-17-setup initdb
+$ cd /var/lib/pgsql/17/data
+$ vi postresql.conf
+
+	listen_addresses = '*'
+
+$ vi pg_hba.conf
+
+	host    all             all             {ip address}/32        md5
+
 $ systemctl enable postgresql-17
 $ systemctl start postgresql-17
+
 $ sudo -u postgres psql
+
+postgres=# ALTER USER postgres WITH PASSWORD 'password';
+postres=# CREATE USER user WITH PASSWORD 'password' CREATEROLE CREATEDB;
 ~~~
