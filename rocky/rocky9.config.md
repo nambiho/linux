@@ -536,3 +536,52 @@ $ sudo -u postgres psql
 postgres=# ALTER USER postgres WITH PASSWORD 'password';
 postres=# CREATE USER user WITH PASSWORD 'password' CREATEROLE CREATEDB;
 ~~~
+
+
+# kubenetis
+## k3s
+
+1. k3s 설치 (서버 모드)
+~~~
+$ curl -sfL https://get.k3s.io | sh -
+~~~
+
+2. 설치 확인
+~~~
+$ sudo systemctl status k3s
+~~~
+
+3. kubeconfig 설정 (일반 사용자도 사용 가능하도록)
+~~~
+$ mkdir -p ~/.kube
+$ sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+$ sudo chown $USER:$USER ~/.kube/config
+~~~
+
+4. kubectl 설치 확인 (k3s와 함께 설치됨)
+~~~
+$ kubectl version --client
+$ kubectl get nodes
+~~~
+
+5. k3s 서비스 관리
+~~~
+$ sudo systemctl start k3s    # 시작
+$ sudo systemctl stop k3s     # 중지
+$ sudo systemctl enable k3s   # 부팅 시 자동 시작
+~~~
+
+6. k9s 설치
+- Termianl UI
+~~~
+$ curl -sS https://webinstall.dev/k9s | bash
+$ . ~/.bashrc
+~~~
+
+7. lens (if need)
+- GUI program
+~~~
+brew install --cask openlens
+winget install openlens
+choco install -y openlens
+~~~
