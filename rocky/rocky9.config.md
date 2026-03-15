@@ -201,7 +201,7 @@ $ systelctl enable nginx
 ~~~
 
 [ref 2](https://nginx.org/en/linux_packages.html#RHEL)
-~~~
+~~~ shell
 $ cd /etc/yum.repos.d
 $ vi nginx.repo
 

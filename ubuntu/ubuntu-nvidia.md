@@ -92,4 +92,15 @@ $ kubectl get pods -n kube-system
 ~~~
 
 쿠버네티스 설정
-개발환경 설정
+# 개발환경 설정
+## ml110 -> gpu server : ssh key copy
+~~~
+$ sudo -u jenkins ssh-keygen -t ed25519 -f /var/lib/jenkins/.ssh/id_ed25519_jenkins_ml110
+$ sudo -u jenkins ssh-copy-id -p 30032 -i /var/lib/jenkins/.ssh/id_ed25519_jenkins_ml110.pub hosung@192.168.3.194
+~~~
+
+# Ollama
+```
+$ curl -fsSL https://ollama.com/install.sh | sh
+$ ollama --version
+```
