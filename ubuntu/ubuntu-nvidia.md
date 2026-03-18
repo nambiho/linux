@@ -91,11 +91,134 @@ $ kubectl get pods -n kube-system
 ~~~
 
 # kubernetes (k8s)
+### index
+```
+1. OS 사전 준비
+2. containerd 설치 및 설정
+3. Kubernetes 패키지 설치
+4. kubeadm init (클러스터 생성)
+5. kubectl 설정
+6. 네트워크 CNI 설치 (Calico)
+7. 단일 노드 설정
+8. 정상 동작 확인
+```
+
+### 1. OS 사전 준비
+##### Swap 비활성화
+- 안하면 kubeadm init 실패
+```bash
+$ swapoff -a
+$ sed -i '/swap/d' /etc/fstab
+```
+
+##### 커널 네트워크 설정
+```bash
+$ cat <<EOF | tee /etc/modules-load.d/k8s.conf
+br_netfilter
+EOF
+
+$ modprobe br_netfilter
+```
+
+```bash
+$ cat <<EOF | tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables=1
+net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-ip6tables=1
+EOF
+
+$ sysctl --system
+```
+
+##### package
+- 없으면 오류 날수 있음
+```bash
+apt update
+apt install -y apt-transport-https ca-certificates curl gnupg
+```
+
+### containerd 설치와 설정
+```bash
+$ apt install -y containerd
+# 설치하면 config.toml 있지만 무시하고 명령 수행
+$ containerd config default | tee /etc/containerd/config.toml
+# cgroup 중요
+$ sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+$ grep "SystemdCgroup" /etc/containerd/config.toml
+$ systemctl restart containerd
+$ systemctl enable containerd
+```
+
+### kubernetes 설치
+```bash
+# 있으면 다음으로 명령
+$ mkdir -p /etc/apt/keyrings
+
+$ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+$ echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+
+$ apt update
+$ apt install -y kubelet kubeadm kubectl
+$ apt-mark hold kubelet kubeadm kubectl
+```
+### 클러스터 생성
+```bash
+$ swapoff -a            # 스왑 메모리 종료
+$ systemctl restart containerd # 컨테이너 런타임 재시작 확인
+$ kubeadm init --pod-network-cidr=10.244.0.0/16
+
+	kubeadm join ... # 해당 블럭 저장
+
+```
+
+[실행 후 메세지 마지막 부분]
+```
+...
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+	kubeadm join 192.168.3.194:6443 --token p39y7u.zwa3npy9xtyczc7i \
+        --discovery-token-ca-cert-hash sha256:95dadafe1dd1cf64f6dfeee0d899721e8570491262a80aefca8b51e2fb4c8a10
+```
+
+### 클러스터 설정 (kubectl 권한 부여)
+```bash
+$ mkdir -p /home/gpuuser/.kube
+$ sudo cp -i /etc/kubernetes/admin.conf /home/gpuuser/.kube/config
+$ sudo chown gpuuser:gpuuser /home/gpuuser/.kube/config
+```
+
+### 네트워크 CNI 설치 (Calico)
+```bash
+# cni 확인
+# 서비스 확인 kube-flannel이나 calico-node
+# Flannel (가장 쉽고 가벼움)
+# Calico (보안 및 고성능)
+$ kubectl get pods -n kube-system
+$ kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+```
 
 
 
 # 개발환경 설정
-## ml110 -> gpu server : ssh key copy
+### ml110 -> gpu server : ssh key copy
 ~~~bash
 $ sudo -u jenkins ssh-keygen -t ed25519 -f /var/lib/jenkins/.ssh/id_ed25519_jenkins_ml110
 $ sudo -u jenkins ssh-copy-id -p 30032 -i /var/lib/jenkins/.ssh/id_ed25519_jenkins_ml110.pub hosung@192.168.3.194
