@@ -206,15 +206,57 @@ $ sudo chown gpuuser:gpuuser /home/gpuuser/.kube/config
 ```
 
 ### 네트워크 CNI 설치 (Calico)
+[참고](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart)
 ```bash
 # cni 확인
 # 서비스 확인 kube-flannel이나 calico-node
 # Flannel (가장 쉽고 가벼움)
 # Calico (보안 및 고성능)
+# 고전적
 $ kubectl get pods -n kube-system
+# 최신
+$ kubectl get namespaces # 여기에 네임스페이스가 있으면
+$ kubectl get pods -n tigera-operator
+
+# 공홈에서
+$ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.4/manifests/tigera-operator.yaml
+$ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.4/manifests/custom-resources.yaml
+
+# 고전적인 설치 방법
 $ kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+
+# 확인
+$ watch kubectl get tigerastatus
+```
+[메세지]
+```bash
+$ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.4/manifests/tigera-operator.yaml
+namespace/tigera-operator created
+serviceaccount/tigera-operator created
+clusterrole.rbac.authorization.k8s.io/tigera-operator-secrets created
+clusterrole.rbac.authorization.k8s.io/tigera-operator created
+clusterrolebinding.rbac.authorization.k8s.io/tigera-operator created
+rolebinding.rbac.authorization.k8s.io/tigera-operator-secrets created
+deployment.apps/tigera-operator created
+
+$ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.4/manifests/custom-resources.yaml
+installation.operator.tigera.io/default created
+apiserver.operator.tigera.io/default created
+goldmane.operator.tigera.io/default created
+whisker.operator.tigera.io/default created
 ```
 
+### 단일 서버인 경우
+- 단일 서버이기 때문에 마스터 서버에서 pod 실행 허용하기
+```bash
+$ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+
+# 아래는 참고만
+# 특정 마스터 노드(master-01)에서만 제한 해제 - 
+$ kubectl taint nodes master-01 node-role.kubernetes.io/control-plane-
+# GPU 노드에 'gpu=true'라는 전용 Taint 추가 (NoSchedule: 허용된 Pod 외엔 금지)
+$ kubectl taint nodes gpu-node-01 gpu=true:NoSchedule
+```
 
 
 # 개발환경 설정
