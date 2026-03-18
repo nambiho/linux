@@ -258,6 +258,80 @@ $ kubectl taint nodes master-01 node-role.kubernetes.io/control-plane-
 $ kubectl taint nodes gpu-node-01 gpu=true:NoSchedule
 ```
 
+### 정상 동작 확인
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
+
+# add worker of kubernetes (k8s)
+### 마스터
+```bash
+$ kubeadm token create --print-join-command
+
+	# 처음 kubeadm init 했던것 처럼 kubeadm jon ... 복사
+	kubeadm join 123.456... --token ... --discovery-token-ca-cert-hash ...
+```
+
+### 워커
+```bash
+$ kubeadm join 123.456... (복사한 내용)
+```
+
+### 확인
+- 마스터
+```bash
+kubectl get nodes
+```
+
+### 마스터가 워커 사용하기
+```bash
+# node 라벨 붙이기
+$ kubectl label nodes ai-server-02 gpu-type=rtx4090
+# yaml에 gpu-type=rtx4090 에는 이런 일을 하라고 지시
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-server
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      # --- 여기가 핵심: 특정 라벨이 있는 노드로만 배포 ---
+      nodeSelector:
+        gpu-type: rtx4090
+      # ---------------------------------------------
+      containers:
+      - name: vllm-container
+        image: vllm/vllm-openai:latest
+        resources:
+          limits:
+            nvidia.com/gpu: 1 # GPU 1개를 점유하겠다는 설정
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MODEL_NAME
+          value: "facebook/opt-125m" # 예시 모델명
+        volumeMounts:
+        - name: model-volume
+          mountPath: /root/.cache/huggingface
+      volumes:
+      - name: model-volume
+        hostPath:
+          path: /ai/models # 실제 AI 서버의 모델 경로
+```
+
 
 # 개발환경 설정
 ### ml110 -> gpu server : ssh key copy
