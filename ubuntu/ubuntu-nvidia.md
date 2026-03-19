@@ -1,13 +1,13 @@
-# ai-server and api server
+# **ai-server and api server**
 
-# install
+# 1. install
 ```
 $ sudo apt update && sudo apt upgrade -y
 $ sudo -i
 ```
 
-# ssh
-### PC
+# 2. ssh
+### 1) PC
 ```
 > ssh-keygen -t ed25519
 > input directory/key-name
@@ -19,7 +19,7 @@ $ sudo -i
 > copy & paste (server .ssh/authorized_keys)
 ```
 
-### server
+### 2) server
 - config ssh ( /etc/ssh/sshd_config)
 - change port
 - PasswordAuthentication no
@@ -31,7 +31,7 @@ $ sudo ufw status
 $ sudo systemctl restart ssh
 ```
 
-# RTX 3080 GPU driver
+# 3. RTX 3080 GPU driver
 ~~~
 $ sudo apt purge -y nvidia*
 $ sudo apt purge -y xserver-xorg-video-nouveau
@@ -48,7 +48,7 @@ $ sudo apt install -y nvidia-cuda-toolkit
 $ nvcc --version
 ~~~
 
-# docker
+# 4. docker
 ~~~
 $ sudo usermod -aG docker hosung
 $ systemctl status docker
@@ -62,7 +62,7 @@ $ sudo systemctl restart docker
 $ sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
 ~~~
 
-# mount hdd
+# 5. mount hdd
 ~~~
 $ sudo fdisk -l
 $ sudo fdisk /dev/sdb
@@ -75,7 +75,7 @@ $ sudo mkdir -p /mnt/ai-data
 $ mount /dev/vg_ai/lv_ai_data /mnt/ai-data
 ~~~
 
-# kubernetes (k3s)
+# 6. kubernetes (k3s)
 ~~~
 $ cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
 $ cd ~/.kube
@@ -90,7 +90,7 @@ $ mkdir -p ./kube/deploy
 $ kubectl get pods -n kube-system
 ~~~
 
-# kubernetes (k8s)
+# 7. kubernetes (k8s)
 ### index
 ```
 1. OS 사전 준비
@@ -103,7 +103,7 @@ $ kubectl get pods -n kube-system
 8. 정상 동작 확인
 ```
 
-### 1. OS 사전 준비
+### 1) OS 사전 준비
 ##### Swap 비활성화
 - 안하면 kubeadm init 실패
 ```bash
@@ -137,7 +137,7 @@ apt update
 apt install -y apt-transport-https ca-certificates curl gnupg
 ```
 
-### containerd 설치와 설정
+### 2) containerd 설치와 설정
 ```bash
 $ apt install -y containerd
 # 설치하면 config.toml 있지만 무시하고 명령 수행
@@ -149,7 +149,7 @@ $ systemctl restart containerd
 $ systemctl enable containerd
 ```
 
-### kubernetes 설치
+### 3) kubernetes 설치
 ```bash
 # 있으면 다음으로 명령
 $ mkdir -p /etc/apt/keyrings
@@ -162,7 +162,7 @@ $ apt update
 $ apt install -y kubelet kubeadm kubectl
 $ apt-mark hold kubelet kubeadm kubectl
 ```
-### 클러스터 생성
+### 4) 클러스터 생성
 ```bash
 $ swapoff -a            # 스왑 메모리 종료
 $ systemctl restart containerd # 컨테이너 런타임 재시작 확인
@@ -198,14 +198,14 @@ Then you can join any number of worker nodes by running the following on each as
         --discovery-token-ca-cert-hash sha256:95dadafe1dd1cf64f6dfeee0d899721e8570491262a80aefca8b51e2fb4c8a10
 ```
 
-### 클러스터 설정 (kubectl 권한 부여)
+### 5) 클러스터 설정 (kubectl 권한 부여)
 ```bash
 $ mkdir -p /home/gpuuser/.kube
 $ sudo cp -i /etc/kubernetes/admin.conf /home/gpuuser/.kube/config
 $ sudo chown gpuuser:gpuuser /home/gpuuser/.kube/config
 ```
 
-### 네트워크 CNI 설치 (Calico)
+### 6) 네트워크 CNI 설치 (Calico)
 [참고](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart)
 ```bash
 # cni 확인
@@ -246,7 +246,7 @@ goldmane.operator.tigera.io/default created
 whisker.operator.tigera.io/default created
 ```
 
-### 단일 서버인 경우
+### 7) 단일 서버인 경우
 - 단일 서버이기 때문에 마스터 서버에서 pod 실행 허용하기
 ```bash
 $ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
@@ -258,14 +258,27 @@ $ kubectl taint nodes master-01 node-role.kubernetes.io/control-plane-
 $ kubectl taint nodes gpu-node-01 gpu=true:NoSchedule
 ```
 
-### 정상 동작 확인
+### 8) 정상 동작 확인
 ```bash
-kubectl get nodes
-kubectl get pods -A
+$ kubectl get nodes
+$ kubectl get pods -A
 ```
 
-# add worker of kubernetes (k8s)
-### 마스터
+### 9) GPU 연결
+[참고 1](https://github.com/NVIDIA/k8s-device-plugin?tab=readme-ov-file)
+[참고 2](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-cri-o)
+```bash
+# create, apply 처음 실행은 상관없음
+# 두번째 재발행 부터는 create 는 오류남
+# $ kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.1/deployments/static/nvidia-device-plugin.yml
+
+$ kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.1/deployments/static/nvidia-device-plugin.yml
+
+$ kubectl describe node | grep -i gpu
+```
+
+# 7. add worker of kubernetes (k8s)
+### 1) 마스터
 ```bash
 $ kubeadm token create --print-join-command
 
@@ -273,18 +286,18 @@ $ kubeadm token create --print-join-command
 	kubeadm join 123.456... --token ... --discovery-token-ca-cert-hash ...
 ```
 
-### 워커
+### 2) 워커
 ```bash
 $ kubeadm join 123.456... (복사한 내용)
 ```
 
-### 확인
+### 3) 확인
 - 마스터
 ```bash
 kubectl get nodes
 ```
 
-### 마스터가 워커 사용하기
+### 4) 마스터가 워커 사용하기
 ```bash
 # node 라벨 붙이기
 $ kubectl label nodes ai-server-02 gpu-type=rtx4090
@@ -333,14 +346,14 @@ spec:
 ```
 
 
-# 개발환경 설정
+# 8. 개발환경 설정
 ### ml110 -> gpu server : ssh key copy
 ~~~bash
 $ sudo -u jenkins ssh-keygen -t ed25519 -f /var/lib/jenkins/.ssh/id_ed25519_jenkins_ml110
 $ sudo -u jenkins ssh-copy-id -p 30032 -i /var/lib/jenkins/.ssh/id_ed25519_jenkins_ml110.pub hosung@192.168.3.194
 ~~~
 
-# Ollama
+# 9. Ollama
 ```bash
 $ curl -fsSL https://ollama.com/install.sh | sh
 $ ollama --version
@@ -405,8 +418,8 @@ $ curl http://127.0.0.1:11434/api/chat \
 
 ```
 
-# vLLM
-### 1. Python 설치
+# 10. vLLM
+### 1) Python 설치
 - Ubuntu 패키지 관리자가 최신 버전을 찾을 수 있도록 `deadsnakes` PPA를 추가
 ```bash
 # PPA 추가를 위한 도구 설치
@@ -421,7 +434,7 @@ $ sudo apt update
 $ sudo apt install python3.12 python3.12-venv python3.12-dev -y
 ```
 
-### 2. pip 설치
+### 2) pip 설치
 ```bash
 # 시스템 전체 pip 설치
 $ sudo apt install python3-pip -y
@@ -431,7 +444,7 @@ $ python3.12 --version
 $ pip3 --version
 ```
 
-### 3. 가상환경
+### 3) 가상환경
 ```bash
 $ cd /ai/vllm
 
@@ -445,7 +458,7 @@ $ source .venv/bin/activate
 $ pip install --upgrade pip
 ```
 
-### 4. vLLM 설치
+### 4) vLLM 설치
 - 가상환경이 활성화된 상태(`(.venv)` 표시 확인)에서 설치
 - 항상 가상환경에서 실행
 
@@ -454,7 +467,7 @@ $ pip install --upgrade pip
 $ pip install vllm
 ```
 
-### 5. 모델 다운로드
+### 5) 모델 다운로드
 ```bash
 $ vi ~/.profile
 
@@ -468,7 +481,7 @@ $ huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ --local-dir /ai/vllm/mod
 $ huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GPTQ --local-dir /ai/vllm/models/TheBloke/Mistral-7B-Instruct-v0.2-GPTQ  --local-dir-use-symlinks False
 ```
 
-### 6. 실행
+### 6) 실행
 ```bash
 $ python3 -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen2.5-7B-Instruct-AWQ \
@@ -489,7 +502,7 @@ $ python -m vllm.entrypoints.openai.api_server --model TheBloke/Mistral-7B-Instr
 2. `--gpu-memory-utilization 0.8`: 기본값은 0.9(90%), 메모리 80% 정도
 3. `--max-model-len 4096`: 한 번에 처리할 문맥 길이를 제한 메모리 보완
 
-### 7. 테스트
+### 7) 테스트
 - 확인용 터미널
 ```bash
 $ docker container ls
