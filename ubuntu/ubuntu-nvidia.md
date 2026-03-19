@@ -268,6 +268,13 @@ $ kubectl get pods -A
 [참고 1](https://github.com/NVIDIA/k8s-device-plugin?tab=readme-ov-file)
 [참고 2](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-cri-o)
 ```bash
+# 도커용 nvidia-container-runtime 툴킷을 containerd 로 이전
+# nvidia-ctk 를 이용
+$ nvidia-ctk runtime configure --runtime=containerd
+$ systemctl restart containerd
+
+
+
 # create, apply 처음 실행은 상관없음
 # 두번째 재발행 부터는 create 는 오류남
 # $ kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.1/deployments/static/nvidia-device-plugin.yml
