@@ -320,7 +320,58 @@ $ watch -n 1 kubectl get pods -A
 [참고](https://helm.sh/ko/docs/v3/intro/install)
 ```bash
 $ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+$ helm version
+$ helm list
 ```
+
+### 11) Metrics 서버
+```bash
+$ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+$ kubectl edit deployment metrics-server -n kube-system
+
+	# 아래 확인 하여 있으면 넣지 않고, 없으면 넣고 저장
+	- --kubelet-insecure-tls #인증 무시
+	- --kubelet-preferred-address-types=InternalIP
+
+$ kubectl delete pod -n kube-system -l k8s-app=metrics-server
+# 10초 후에
+$ kubectl top nodes
+$ kubectl logs -n kube-system deployment/metrics-server
+```
+
+### 12) longhorn 설치
+- 데이터 공유라고 하는데 왜 쓰는지 아직 모름
+- 기본 디렉토리가 /var/lib/longhorn 이고 서버마다 같은 디렉토리여야함
+- A서버에서 /ai, B서버에서 /var/lib 이면 안된다고 함
+- 다른 서버에서 지정된 모델을 사용 하기 위해서 넣는다고 하는데
+- 이해가 부족해서 삭제 함
+
+##### 설치
+```bash
+$ helm repo add longhorn https://charts.longhorn.io
+$ helm repo update
+$ kubectl create namespace longhorn-system
+$ helm install longhorn longhorn/longhorn --namespace longhorn-system
+$ kubectl get pods -n longhorn-system
+```
+##### StorageClass 설정
+```bash
+$ kubectl get storageclass
+$ kubectl patch storageclass longhorn -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+```
+
+##### 삭제
+```bash
+kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn/v1.6.0/deploy/longhorn.yaml
+helm uninstall longhorn -n longhorn-system
+kubectl delete namespace longhorn-system
+kubectl get all -n longhorn-system # 더 있는지 확인
+sudo rm -rf /var/lib/longhorn
+kubectl get storageclass
+kubectl delete storageclass longhorn
+kubectl delete storageclass longhorn-static
+```
+
 
 # 7. add worker of kubernetes (k8s)
 ### 1) 마스터
