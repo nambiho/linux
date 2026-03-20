@@ -101,6 +101,8 @@ $ kubectl get pods -n kube-system
 6. 네트워크 CNI 설치 (Calico)
 7. 단일 노드 설정
 8. 정상 동작 확인
+9. GPU 연결
+10. helm 설치
 ```
 
 ### 1) OS 사전 준비
@@ -272,8 +274,7 @@ $ kubectl get pods -A
 # nvidia-ctk 를 이용
 $ nvidia-ctk runtime configure --runtime=containerd
 $ systemctl restart containerd
-
-
+$ kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.1/deployments/static/nvidia-device-plugin.yml
 
 # create, apply 처음 실행은 상관없음
 # 두번째 재발행 부터는 create 는 오류남
@@ -282,6 +283,43 @@ $ systemctl restart containerd
 $ kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.1/deployments/static/nvidia-device-plugin.yml
 
 $ kubectl describe node | grep -i gpu
+# 명령을 했을때 처음에 아무것도 안나와서 [Troubleshooting -1] 처리함
+# 처리 완료 후 다음 메세지 나옴
+  nvidia.com/gpu:     1
+  nvidia.com/gpu:     1
+  nvidia.com/gpu     0           0
+```
+
+[Troubleshooting - 1]
+```bash
+# calico-system이 ns 없음
+# 원인 : kubeadm init --pod-network-cidr=10.244.0.0/16 할때 
+# 10.244.0.0은 Flannel ip 대역이고, 
+# calico 는 192.168.0.0 을 기본 대역으로 사용함
+# 그래서 네트워크가 실행이 안됨
+###
+$ kubectl cluster-info dump | grep -i podcidr
+                "podCIDR": "10.244.0.0/24",
+                "podCIDRs": [
+I0318 10:53:16.860724       1 range_allocator.go:380] "Set node PodCIDR" node="ai-server-1" podCIDRs=["10.244.0.0/24"]
+# 수정
+
+$ kubectl delete -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.4/manifests/custom-resources.yaml
+$ curl -O https://raw.githubusercontent.com/projectcalico/calico/v3.31.4/manifests/custom-resources.yaml
+$ vi custom-resources.yaml
+
+	cidr: 192.168.0.0/16 #<- 이 부분을
+	cidr: 10.244.0.0/16 #<- 이렇게 변경 하고 저장
+
+$ kubectl apply -f custom-resources.yaml
+$ watch -n 1 kubectl get pods -A
+# calico-system 이 모두 running 이 되는 것 확인
+```
+
+### 10) helm 설치
+[참고](https://helm.sh/ko/docs/v3/intro/install)
+```bash
+$ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 
 # 7. add worker of kubernetes (k8s)
