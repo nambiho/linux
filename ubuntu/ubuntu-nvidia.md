@@ -373,6 +373,67 @@ kubectl delete storageclass longhorn-static
 ```
 
 
+### 13) nginx ingress controller 설치
+##### URL 설치
+```bash
+# 보통 테스트용으로 설치하지만 기능은 모두 됨
+$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+$ kubectl get pods -n ingress-nginx
+$ kubectl get svc -n ingress-nginx
+# 다음으로 테스트 ingress yaml 생성하고 테스트 합니다.
+```
+```yaml
+# test-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-ingress
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: test.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-service
+            port:
+              number: 80
+```
+
+```bash
+$ kubectl apply -f test-ingress.yaml
+```
+
+##### helm 설치
+```bash
+# 1. 레포지토리 추가 및 업데이트
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# 2. 설치 (이름은 'my-nginx'로 지정)
+helm install my-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+```
+
+
+
+
+```bash
+helm install my-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \ # AWS 사용 시
+  --set controller.config.proxy-body-size="50m" \ # 파일 업로드 용량 제한 해제
+  --set controller.config.proxy-read-timeout="300" # AI 추론 대기 시간 연장
+```
+
+
+
+
 # 7. add worker of kubernetes (k8s)
 ### 1) 마스터
 ```bash
