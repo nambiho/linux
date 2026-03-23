@@ -411,30 +411,179 @@ $ kubectl apply -f test-ingress.yaml
 
 ##### helm 설치
 ```bash
-# 1. 레포지토리 추가 및 업데이트
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
+# 레포지토리 추가 및 업데이트
+$ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+$ helm repo update
 
-# 2. 설치 (이름은 'my-nginx'로 지정)
-helm install my-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace
-```
-
-
-
-
-```bash
-helm install my-nginx ingress-nginx/ingress-nginx \
+# 설치
+# 이름은 지정 해야함
+# 다음 처럼 명령어에 옵션을 붙일수도 있지만
+# 보통 values.yaml 파일을 만들어서 실행 하고 업데이트 한다.
+$ helm install my-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"="nlb" \ # AWS 사용 시
   --set controller.config.proxy-body-size="50m" \ # 파일 업로드 용량 제한 해제
   --set controller.config.proxy-read-timeout="300" # AI 추론 대기 시간 연장
+
+# 다음과 같이 values.yaml 을 만들수 있음
+# controller:
+#   config:
+#    # AI 응답 대기 시간 (300초)
+#    proxy-read-timeout: "300"
+#    # 요청 본문 크기 제한 (50MB)
+#    proxy-body-size: "50m"
+#  service:
+#    annotations:
+#      # AWS 환경에서 NLB 사용 시 활성화 (AWS가 아니면 삭제 가능)
+#      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+```
+
+##### MetalLB 설치
+```bash
+$ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
+
+$ ip a # 실제 ip 대역의 ip를 할당 해야하기 때문에
+```
+
+```yaml
+# metallb-config.yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.3.240-192.168.3.250
+```
+
+```bash
+$ kubectl apply -f ~/kube-config/metallb/metallb-config.yaml
+```
+
+```yaml
+# values.yaml
+# 서비스 타입 (NodePort / LoadBalancer)
+# ingress 클래스 이름
+# 복제 수 (고가용성)
+# CPU / 메모리 제한
+
+# NodePort/LoadBalancer
+# LoadBalancer 는
+# 클라우드의 로드밸러스를 이용하지 않는다면 MetalLB 같은  지원 서비스 설치 해야함
+controller:
+  service:
+    type: LoadBalancer
+
+  ingressClassResource:
+    name: nginx
+    enabled: true
+
+  replicaCount: 2
+
+  config:
+    proxy-read-timeout: "300"
+    proxy-body-size: "50m"
+
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+```
+
+```bash
+# namespace 생성
+# 이렇게 따로 만들수도 있고, nginx controller 생성시에 넣을수도 있다.
+# nginx controller 생성시에 namespace 생성할때는 업데이트 할때는 빼야함
+# -n ingress-nginx --create-namespace \
+$ kubectl create namespace ingress-nginx
+$ helm install ingress-nginx ingress-nginx/ingress-nginx \
+-n ingress-nginx \
+-f ~/kube-config/helm/nginx/values.yaml
+
+# 실행 메세지
+	NAME: ingress-nginx
+	LAST DEPLOYED: Mon Mar 23 13:59:36 2026
+	NAMESPACE: ingress-nginx
+	STATUS: deployed
+	REVISION: 1
+	TEST SUITE: None
+	NOTES:
+	The ingress-nginx controller has been installed.
+	It may take a few minutes for the load balancer IP to be available.
+	You can watch the status by running 'kubectl get service --namespace default ingress-nginx-controller --output wide --watch'
+
+	An example Ingress that makes use of the controller:
+		apiVersion: networking.k8s.io/v1
+		kind: Ingress
+		metadata:
+			name: example
+			namespace: foo
+		spec:
+			ingressClassName: nginx
+			rules:
+				- host: www.example.com
+					http:
+						paths:
+							- pathType: Prefix
+								backend:
+									service:
+										name: exampleService
+										port:
+											number: 80
+								path: /
+			# This section is only required if TLS is to be enabled for the Ingress
+			tls:
+				- hosts:
+					- www.example.com
+					secretName: example-tls
+
+	If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
+
+		apiVersion: v1
+		kind: Secret
+		metadata:
+			name: example-tls
+			namespace: foo
+		data:
+			tls.crt: <base64 encoded cert>
+			tls.key: <base64 encoded key>
+		type: kubernetes.io/tls
+
+
+# 몇분 후에
+$ kubectl get svc -n ingress-nginx
+```
+
+[Troubleshooting - nginx controller]
+- helm 으로 ingress-nginx 를 설치 할때 namespace를 지정 하지 않아서
+- kubectl get svc -n ingress-nginx 가 나오지 않고
+- kubectl get svc -n default 에 리스트가 나오고 있음
+- nginx 를 삭제 하고 다시 설정 해야함
+- 그리고 위 helm 설치 내용에 -n ingress-nginx 를 추가 했음
+```bash
+$ helm list -A
+$ helm uninstall ingress-nginx -n default
+$ kubectl delete namespace ingress-nginx
+$ helm install ingress-nginx ingress-nginx/ingress-nginx \
+-n ingress-nginx \
+-f ~/kube-config/helm/nginx/values.yaml
+$ kubectl get svc -n ingress-nginx
+```
+
+### 14) k9s
+- kubernetes 설치 후에 언제든 설치 가능함
+```bash
+$ curl -sS https://webinstall.dev/k9s | bash
+$ . ~/.bashrc
 ```
 
 
-
-
 # 7. add worker of kubernetes (k8s)
+- 다른 서버에서 쿠버네티스 워커를 추가 할때
 ### 1) 마스터
 ```bash
 $ kubeadm token create --print-join-command
