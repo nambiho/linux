@@ -103,6 +103,10 @@ $ kubectl get pods -n kube-system
 8. 정상 동작 확인
 9. GPU 연결
 10. helm 설치
+11. Metrics 서버
+12. longhorn 설치
+13. nginx ingress controller 설치
+14. k9s
 ```
 
 ### 1) OS 사전 준비
