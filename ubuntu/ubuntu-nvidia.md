@@ -107,6 +107,8 @@ $ kubectl get pods -n kube-system
 12. longhorn 설치
 13. nginx ingress controller 설치
 14. k9s
+15. gpu test
+16. vLLM 배포
 ```
 
 ### 1) OS 사전 준비
@@ -584,6 +586,141 @@ $ kubectl get svc -n ingress-nginx
 $ curl -sS https://webinstall.dev/k9s | bash
 $ . ~/.bashrc
 ```
+
+
+### 15) gpu test
+```yaml
+# gpu-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-test
+spec:
+  restartPolicy: Never
+  containers:
+  - name: cuda
+    image: nvidia/cuda:12.2.0-base-ubuntu22.04
+    command: ["nvidia-smi"]
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+```
+
+```bash
+$ kubectl apply -f ~/kube-config/gpu-test/gpu-test.yaml
+$ kubectl logs gpu-test
+```
+
+### 16) vLLM 배포
+```yaml
+# vllm.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-qwen
+  labels:
+    app: vllm-qwen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-qwen
+  template:
+    metadata:
+      labels:
+        app: vllm-qwen
+    spec:
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          # command: ["python", "-m", "vllm.entrypoints.openai.api_server"]
+          # args:
+          #   - "--model"
+          #   - "/models"
+          #   - "--quantization"
+          #   - "awq"
+          #   - "--gpu-memory-utilization"
+          #   - "0.7"
+          #   - "--max-model-len"
+          #   - "2048"
+          #   - "--port"
+          #   - "8001"
+          args:
+            - "--model"
+            - "/models"
+            - "--quantization"
+            - "awq"
+            - "--gpu-memory-utilization"
+            - "0.7"
+            - "--max-model-len"
+            - "2048"
+            - "--port"
+            - "8001"
+          ports:
+            - containerPort: 8001
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - name: model
+              mountPath: /models
+      volumes:
+        - name: model
+          hostPath:
+            path: /ai/vllm/models/Qwen
+            type: Directory
+```
+
+```yaml
+# service-qwen.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-qwen
+  labels:
+    app: vllm-qwen
+spec:
+  selector:
+    app: vllm-qwen
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
+```
+
+```yaml
+# ingress-qwen.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vllm-qwen
+  labels:
+    app: vllm-qwen
+spec:
+  ingressClassName: nginx
+  # tls:
+  #   - hosts:
+  #       - qwen.example.com
+  #     secretName: qwen-tls
+  rules:
+    #- host: vllm-qwen.local
+    -  http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vllm-qwen
+                port:
+                  number: 8001
+```
+
+
+
+
 
 
 # 7. add worker of kubernetes (k8s)
