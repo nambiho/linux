@@ -612,12 +612,16 @@ $ kubectl logs gpu-test
 ```
 
 ### 16) vLLM 배포
+[참고 - vllm k8s](https://docs.vllm.ai/en/stable/deployment/k8s/)
+[참고 - vllm/vllm-openai](https://hub.docker.com/r/vllm/vllm-openai)
 ```yaml
-# vllm.yaml
+# deployment-qwen.yaml
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vllm-qwen
+	namespace: ai
   labels:
     app: vllm-qwen
 spec:
@@ -632,11 +636,11 @@ spec:
     spec:
       containers:
         - name: vllm
-          image: vllm/vllm-openai:latest
+          image: vllm/vllm-openai:v0.10.2 # 버전을 latest 사용하지 않고 직접 입력
           # command: ["python", "-m", "vllm.entrypoints.openai.api_server"]
           # args:
           #   - "--model"
-          #   - "/models"
+          #   - "/models/Qwen2.5-7B-Instruct-AWQ"
           #   - "--quantization"
           #   - "awq"
           #   - "--gpu-memory-utilization"
@@ -647,7 +651,7 @@ spec:
           #   - "8001"
           args:
             - "--model"
-            - "/models"
+            - "/models/Qwen2.5-7B-Instruct-AWQ"
             - "--quantization"
             - "awq"
             - "--gpu-memory-utilization"
@@ -668,7 +672,7 @@ spec:
       volumes:
         - name: model
           hostPath:
-            path: /ai/vllm/models/Qwen
+            path: /ai/vllm/models/Qwen/Qwen2.5-7B-Instruct-AWQ
             type: Directory
 ```
 
@@ -678,6 +682,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: vllm-qwen
+	namespace: ai
   labels:
     app: vllm-qwen
 spec:
@@ -691,14 +696,18 @@ spec:
 ```
 
 ```yaml
-# ingress-qwen.yaml
+# ingress-serve.yaml
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: vllm-qwen
+  name: vllm-serve
+	namespace: ai
+	annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
   labels:
-    app: vllm-qwen
+    app: vllm-serve
 spec:
   ingressClassName: nginx
   # tls:
@@ -709,17 +718,58 @@ spec:
     #- host: vllm-qwen.local
     -  http:
         paths:
-          - path: /
-            pathType: Prefix
+          - path: /qwen(/|$)(.*)
+            pathType: ImplementationSpecific # Prefix 를 사용하지 않음
             backend:
               service:
                 name: vllm-qwen
                 port:
                   number: 8001
+          - path: /llama(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: vllm-llama
+                port:
+                  number: 8001
+					- path: /mistral(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: vllm-mistral
+                port:
+                  number: 8001
+```
+```bash
+$ kubectl apply -f ~/kube-config/vllm/deployment-qwen.yaml
+$ curl http://192.168.3.241/qwen/v1/chat/completions \
+-X POST \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "/models",
+  "messages": [
+    { "role": "user", "content": "자기소개를 한 문장으로 해줘." }
+  ],
+  "stream": false
+}'
 ```
 
 
+[troubleshoot - 경로문제]
+- deployment-qwen.yaml
+- args의 -model내용에 /models/Qwen...을 사용했었는데
+- /models로 변경 하고 해결
 
+[troubleshoot - vllm 버전 문제]
+- 컨테이너가 더 새로운 CUDA 런타임을 사용하려고 함
+- 호스트의 NVIDIA 드라이버가 그 CUDA를 직접 지원하지 못함
+- 그래서 CUDA가 forward compatibility 방식으로 우회하려고 하는데
+- 현재 GPU/하드웨어가 그 방식을 지원하지 않음
+- 아래 명령을 이용해서 cuda 버전이 맞는 것 이미지 버전을 찾아야 한다.
+- kubectl get pod -n ai 해서 pod 이름을 확인
+- kubectl -n ai exec -it  vllm-qwen-5d89c96c9d-knxv7 -- python3 -c "import torch; print(f'torch : {torch.__version__}'); print(f'cuda : {torch.version.cuda}')"
+- 버전을 변경 해 가면서 실행 되는 이미지를 선택
+- cuda 버전 12.8 은 v0.10.2
 
 
 
