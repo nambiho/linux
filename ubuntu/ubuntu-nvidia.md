@@ -585,6 +585,38 @@ $ helm install ingress-nginx ingress-nginx/ingress-nginx \
 $ kubectl get svc -n ingress-nginx
 ```
 
+[Troubleshooting - 다른 PC에서 연결 안됨]
+```bash
+# ip가 x.x.x.241로 잡혀 있는데 다른 pc에서 접근이 안됨
+kubectl get pods -n metallb-system -o wide
+ip a
+```
+
+```yaml
+# l2advertisement.yaml
+
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - default-pool
+  interfaces:
+  - enp3s0
+```
+
+```bash
+kubectl apply -f l2advertisement.yaml
+kubectl delete pod -n metallb-system -l component=speaker
+kubectl get configmap kube-proxy -n kube-system -o yaml | grep strictARP
+  strictARP: false
+kubectl edit configmap kube-proxy -n kube-system
+  strictARP: true
+kubectl delete pod -n kube-system -l k8s-app=kube-proxy
+```
+
 ### 14) k9s
 - kubernetes 설치 후에 언제든 설치 가능함
 ```bash
