@@ -117,6 +117,11 @@ $ kubectl get pods -n kube-system
 ```bash
 $ swapoff -a
 $ sed -i '/swap/d' /etc/fstab
+$ vi /etc/fstab
+# vi 에서 nvme0n1p2의 내용을 주석 처리 
+# 만약 없다면 아래도 처리
+$ systemctl mask dev-nvme0n1p2.swap
+# free -h 했을때 swap부분에 0 0 0 이 나와야 함
 ```
 
 ##### 커널 네트워크 설정
@@ -672,7 +677,7 @@ spec:
       volumes:
         - name: model
           hostPath:
-            path: /ai/vllm/models/Qwen/Qwen2.5-7B-Instruct-AWQ
+            path: /ai/models/vllm/models/Qwen/Qwen2.5-7B-Instruct-AWQ
             type: Directory
 ```
 
@@ -824,7 +829,7 @@ spec:
       volumes:
         - name: ollama-data
           hostPath:
-            path: /ai/ollama
+            path: /ai/models/ollama
             type: Directory
 ```
 
@@ -996,7 +1001,7 @@ $ watch -n 1 nvidia-smi # <- 상태 확인으로는 이 명령이 더 좋음
 $ systemctl edit ollama
 
 	[Service]
-	Environment="OLLAMA_MODELS=/ai/ollama"
+	Environment="OLLAMA_MODELS=/ai/models/ollama"
 	Environment="OLLAMA_HOST=0.0.0.0"
 
 $ systemctl daemon-reload
@@ -1094,14 +1099,14 @@ $ pip install vllm
 ```bash
 $ vi ~/.profile
 
-	export HF_HOME='/ai/vllm/cache'
-	export OLLAMA_MODELS='/ai/ollama'
+	export HF_HOME='/ai/models/vllm/cache'
+	export OLLAMA_MODELS='/ai/models/ollama'
 
 $ cd /ai/vllm
 $ . ./.venv/bin/activate
 $ pip install huggingface_cli
-$ huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ --local-dir /ai/vllm/models/Qwen/Qwen2.5-7B-Instruct-AWQ --local-dir-use-symlinks False
-$ huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GPTQ --local-dir /ai/vllm/models/TheBloke/Mistral-7B-Instruct-v0.2-GPTQ  --local-dir-use-symlinks False
+$ huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ --local-dir /ai/models/vllm/models/Qwen/Qwen2.5-7B-Instruct-AWQ --local-dir-use-symlinks False
+$ huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GPTQ --local-dir /ai/models/vllm/models/TheBloke/Mistral-7B-Instruct-v0.2-GPTQ  --local-dir-use-symlinks False
 ```
 
 ### 6) 실행
