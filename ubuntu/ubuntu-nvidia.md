@@ -754,7 +754,6 @@ $ curl http://192.168.3.241/qwen/v1/chat/completions \
 }'
 ```
 
-
 [troubleshoot - 경로문제]
 - deployment-qwen.yaml
 - args의 -model내용에 /models/Qwen...을 사용했었는데
@@ -771,6 +770,133 @@ $ curl http://192.168.3.241/qwen/v1/chat/completions \
 - 버전을 변경 해 가면서 실행 되는 이미지를 선택
 - cuda 버전 12.8 은 v0.10.2
 
+
+### 17) Ollama 배포
+```bash
+# vllm 이 모든 VRAM을 차지 하고 있기 때문에 중지 또는 삭제를 해야함
+# name은 pod 이름이 아니고 등록할때 yaml에 있는 이름
+$ kubectl get deployment -n ai
+# 셋중 하나
+$ kubectl scale deployment [name] -n ai --replicas=0
+$ kubectl delete deployment [name] -n ai
+$ kubectl delete -f deployment-qwen.yaml
+
+# 나머지 service, ingress도 삭제 해도 됨
+$ kubectl delete service [name] -n ai
+$ kubectl delete ingress [name] -n ai
+```
+
+```yaml
+# deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: ai
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.18.2 # 버전을 latest 사용하지 않고 직접 입력
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:11434"
+          ports:
+            - containerPort: 11434
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama/models
+      volumes:
+        - name: ollama-data
+          hostPath:
+            path: /ai/ollama
+            type: Directory
+```
+
+```yaml
+# service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: ai
+  labels:
+    app: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
+  type: ClusterIP
+```
+
+```yaml
+# ingress-serve.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ollama-serve
+  namespace: ai
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  labels:
+    app: ollama-serve
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /ollama(/|$)(.*)
+            pathType: ImplementationSpecific # Prefix 를 사용하지 않음
+            backend:
+              service:
+                name: ollama
+                port:
+                  number: 11434
+```
+
+```bash
+$ kubectl apply -f ~/kube-config/ollama/deployment.yaml
+$ kubectl apply -f ~/kube-config/ollama/service.yaml
+$ kubectl apply -f ~/kube-config/ollama/ingress-serve.yaml
+
+$ curl http://192.168.3.241/ollama/v1/chat/completions \
+-X POST \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "qwen2.5:7b-instruct",
+  "messages": [
+    { "role": "user", "content": "자기소개를 한 문장으로 해줘." }
+  ],
+  "stream": false
+}'
+
+# 모델 다운로드
+$ kubectl -n ai exec -it <ollama-pod> -- ollama pull llama3
+
+# 테스트
+$ curl http://ollama.local/api/tags
+```
 
 
 # 7. add worker of kubernetes (k8s)
