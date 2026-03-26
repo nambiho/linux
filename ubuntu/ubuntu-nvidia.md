@@ -615,7 +615,23 @@ kubectl get configmap kube-proxy -n kube-system -o yaml | grep strictARP
 kubectl edit configmap kube-proxy -n kube-system
   strictARP: true
 kubectl delete pod -n kube-system -l k8s-app=kube-proxy
+
+kubectl edit l2advertisements l2 -n metallb-system
+kubectl logs -n metallb-system -l component=speaker --tail=20
 ```
+
+```bash
+# IP 주소 풀 확인:
+kubectl get ipaddresspools.metallb.io -n metallb-system
+
+# L2 광고 설정 확인 (이게 없으면 ARP 응답을 안 합니다):
+kubectl get l2advertisements.metallb.io -n metallb-system
+
+#만약 위 리소스들의 상세 내용을 보고 싶다면 뒤에 -o yaml을 붙이시면 됩니다.
+
+kubectl get ipaddresspools -n metallb-system -o yaml
+```
+
 
 ### 14) k9s
 - kubernetes 설치 후에 언제든 설치 가능함
