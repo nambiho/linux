@@ -451,7 +451,7 @@ $ helm install my-nginx ingress-nginx/ingress-nginx \
 
 ##### MetalLB 설치
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
 
 $ ip a # 실제 ip 대역의 ip를 할당 해야하기 때문에
 ```
