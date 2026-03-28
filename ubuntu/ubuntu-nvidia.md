@@ -637,8 +637,8 @@ kubectl get ipaddresspools -n metallb-system -o yaml
 # 마지막에 다른 PC에서 접근 할때 ping으로 확인이 안되었고
 # curl 테스트로 확인을 했다.
 # ping으로는 계속 정산적인 메세지는 나오지 않았다.
-# 다음은 마지막에 변경 했던 몇가지 명령이다.
-kubectl get node ai-server-1 -o yaml | grep -i "exclud\|metallb\|label" | head -20
+# 다음은 수정 중 사용된 여러가지 사용한 명령이다.
+kubectl get node ai-server-1 -o yaml | grep -i "exclud\|metallb\|label" | head -20 # 이것을 수정 했을때 reply 메세지가 나왔음 - 이것 때문인지는 모름
 kubectl label node ai-server-1 node.kubernetes.io/exclude-from-external-load-balancers-
 tcpdump -i enp3s0 arp -n
 kubectl get ipaddresspool -n metallb-system
@@ -658,9 +658,7 @@ kubectl rollout restart daemonset speaker -n metallb-system
 kubectl get svc ingress-nginx-controller -n ingress-nginx | grep -i external
 kubectl describe svc ingress-nginx-controller -n ingress-nginx | grep "Traffic Policy"
 
-kubectl patch svc ingress-nginx-controller -n ingress-nginx \
-  -p '{"spec":{"externalTrafficPolicy":"Cluster"}}'
-
+kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"externalTrafficPolicy":"Cluster"}}'
 
 sysctl -w net.ipv4.conf.all.rp_filter=0
 sysctl -w net.ipv4.conf.default.rp_filter=0
@@ -679,7 +677,6 @@ sysctl net.ipv4.conf.all.arp_announce
 
 arp -a | grep 192.168.3.241
 ip a | grep 192.168.3.241
-
 
 kubectl logs -n metallb-system -l component=speaker | grep -i announcing
 ```
