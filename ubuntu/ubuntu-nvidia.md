@@ -632,6 +632,58 @@ kubectl get l2advertisements.metallb.io -n metallb-system
 kubectl get ipaddresspools -n metallb-system -o yaml
 ```
 
+```bash
+# 꽤 많은 변경을 진행 했지만 정확한 원인을 파악하지 못했다.
+# 마지막에 다른 PC에서 접근 할때 ping으로 확인이 안되었고
+# curl 테스트로 확인을 했다.
+# ping으로는 계속 정산적인 메세지는 나오지 않았다.
+# 다음은 마지막에 변경 했던 몇가지 명령이다.
+kubectl get node ai-server-1 -o yaml | grep -i "exclud\|metallb\|label" | head -20
+kubectl label node ai-server-1 node.kubernetes.io/exclude-from-external-load-balancers-
+tcpdump -i enp3s0 arp -n
+kubectl get ipaddresspool -n metallb-system
+kubectl get l2advertisement -n metallb-system
+kubectl logs -n metallb-system -l component=controller --tail=20
+kubectl logs -n metallb-system -l component=controller -f | grep -i "241\|error\|allocat"
+# pool 삭제 후 재생성
+kubectl delete ipaddresspool default-pool -n metallb-system
+kubectl delete l2advertisement l2-all -n metallb-system
+
+kubectl logs -n metallb-system -l component=controller --tail=50 | grep -i "241\|error\|warn\|allocat"
+
+# 터미널 2 - speaker 재시작
+kubectl rollout restart daemonset speaker -n metallb-system
+
+
+kubectl get svc ingress-nginx-controller -n ingress-nginx | grep -i external
+kubectl describe svc ingress-nginx-controller -n ingress-nginx | grep "Traffic Policy"
+
+kubectl patch svc ingress-nginx-controller -n ingress-nginx \
+  -p '{"spec":{"externalTrafficPolicy":"Cluster"}}'
+
+
+sysctl -w net.ipv4.conf.all.rp_filter=0
+sysctl -w net.ipv4.conf.default.rp_filter=0
+sysctl -w net.ipv4.conf.enp3s0.rp_filter=0
+sysctl -w net.ipv4.conf.enp3s0.send_redirects=0
+sysctl -w net.ipv4.conf.all.send_redirects=0
+sysctl -w net.ipv4.conf.enp3s0.accept_local=1
+sysctl -w net.ipv4.conf.all.accept_local=1
+
+
+sysctl net.ipv4.conf.enp3s0.rp_filter
+sysctl net.ipv4.conf.all.rp_filter
+sysctl net.ipv4.conf.default.rp_filter
+sysctl net.ipv4.conf.all.arp_ignore
+sysctl net.ipv4.conf.all.arp_announce
+
+arp -a | grep 192.168.3.241
+ip a | grep 192.168.3.241
+
+
+kubectl logs -n metallb-system -l component=speaker | grep -i announcing
+```
+
 
 ### 14) k9s
 - kubernetes 설치 후에 언제든 설치 가능함
