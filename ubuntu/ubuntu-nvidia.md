@@ -385,7 +385,7 @@ kubectl delete storageclass longhorn-static
 
 
 ### 13) nginx ingress controller 설치
-##### URL 설치
+##### URL 설치 (테스트용)
 ```bash
 # 보통 테스트용으로 설치하지만 기능은 모두 됨
 $ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
@@ -420,7 +420,7 @@ spec:
 $ kubectl apply -f test-ingress.yaml
 ```
 
-##### helm 설치
+##### helm 으로 설치(이것으로 설치)
 ```bash
 # 레포지토리 추가 및 업데이트
 $ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -513,7 +513,7 @@ controller:
 $ kubectl create namespace ingress-nginx
 $ helm install ingress-nginx ingress-nginx/ingress-nginx \
 -n ingress-nginx \
--f ~/kube-config/helm/nginx/values.yaml
+-f ~/kube-config/nginx-ingress/service/loadbalance.yaml
 
 # 실행 메세지
 	NAME: ingress-nginx
@@ -581,7 +581,7 @@ $ helm uninstall ingress-nginx -n default
 $ kubectl delete namespace ingress-nginx
 $ helm install ingress-nginx ingress-nginx/ingress-nginx \
 -n ingress-nginx \
--f ~/kube-config/helm/nginx/values.yaml
+-f ~/kube-config/nginx-ingress/service/loadbalance.yaml
 $ kubectl get svc -n ingress-nginx
 ```
 
@@ -679,6 +679,76 @@ arp -a | grep 192.168.3.241
 ip a | grep 192.168.3.241
 
 kubectl logs -n metallb-system -l component=speaker | grep -i announcing
+```
+
+
+##### NodePort 로 변경
+- MetalLB 설정이 어려움
+- 실제 로드 밸런스의 기능 활용이 무색함
+```bash
+cd ~/kube-config/nginx-ingress/service
+cp loadbalance.yaml loadbalance.yaml.bak
+cp loadbalance.yaml nodeport.yaml
+vi nodeport.yaml
+```
+```yaml
+controller:
+  service:
+    type: NodePort
+
+  nodePorts:
+    http: 32096
+    https: 31266
+
+  ingressClassResource:
+    name: nginx
+    enabled: true
+
+  replicaCount: 2
+
+  config:
+    proxy-read-timeout: "300"
+    proxy-body-size: "50m"
+
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+```
+```bash
+helm upgrade ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx -f ./nodeport.yaml
+kubectl get svc -n ingress-nginx
+```
+```bash
+# 다른 PC 에서
+# ollama 일때 테스트 했음
+curl http://192.168.3.194:32097/ollama/v1/chat/completions \
+-X POST \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "qwen2.5:7b-instruct",
+  "messages": [
+    { "role": "user", "content": "자기소개를 한 문장으로 해줘." }
+  ],
+  "stream": false
+}'
+```
+
+```bash
+# metallb 삭제
+kubectl get svc -A | grep LoadBalancer # 목록이 나오면 삭제 하면 안됨
+
+kubectl get ipaddresspool,l2advertisement,bgppeer,bgpadvertisement -n metallb-system
+kubectl get all -n metallb-system
+kubectl delete daemonset speaker -n metallb-system
+kubectl delete svc metallb-webhook-service -n metallb-system
+kubectl delete deployment controller -n metallb-system
+kubectl get all -n metallb-system
+kubectl get ns
+kubectl delete ns metallb-system
 ```
 
 
@@ -844,7 +914,7 @@ spec:
 ```
 ```bash
 $ kubectl apply -f ~/kube-config/vllm/deployment-qwen.yaml
-$ curl http://192.168.3.241/qwen/v1/chat/completions \
+$ curl http://192.168.3.194:32097/qwen/v1/chat/completions \
 -X POST \
 -H "Content-Type: application/json" \
 -d '{
@@ -982,7 +1052,7 @@ $ kubectl apply -f ~/kube-config/ollama/deployment.yaml
 $ kubectl apply -f ~/kube-config/ollama/service.yaml
 $ kubectl apply -f ~/kube-config/ollama/ingress-serve.yaml
 
-$ curl http://192.168.3.241/ollama/v1/chat/completions \
+$ curl http://192.168.3.194:32097/ollama/v1/chat/completions \
 -X POST \
 -H "Content-Type: application/json" \
 -d '{
