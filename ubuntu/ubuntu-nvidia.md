@@ -695,10 +695,9 @@ vi nodeport.yaml
 controller:
   service:
     type: NodePort
-
-  nodePorts:
-    http: 32096
-    https: 31266
+		nodePorts:
+			http: 32096
+			https: 31266
 
   ingressClassResource:
     name: nginx
