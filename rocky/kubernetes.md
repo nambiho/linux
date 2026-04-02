@@ -560,29 +560,48 @@ kubectl get pods -n ingress-nginx -o wide
 kubectl create namespace tomboy
 ```
 
-### 10-2. 컨테이너 이미지 빌드 및 워커 전송
+### 10-2. 컨테이너 이미지 빌드 및 배포
 
-`deployment.yaml`의 `imagePullPolicy: IfNotPresent` 설정에 의해, **워커 노드의 containerd에 이미지가 있어야** 합니다.
+#### 이미지 배포 방식 — 레지스트리 유무에 따라 다름
 
-**[마스터] 이미지 빌드:**
+| | 레지스트리 없음 (현재) | 레지스트리 있음 |
+|--|----------------------|----------------|
+| 빌드 후 처리 | `docker save` → `scp` → `ctr import` | `docker push` |
+| 노드 추가 시 | 노드마다 수동으로 이미지 전송 필요 | 쿠버네티스가 각 노드에서 자동 pull |
+| deployment.yaml | `image: auth-server:latest` | `image: 레지스트리IP/tomboy/auth-server:latest` |
+| imagePullPolicy | `IfNotPresent` | `Always` 권장 |
+| 적합한 환경 | 노드 1~2대 소규모, 폐쇄망 | 노드 다수, CI/CD 자동화 |
+
+#### 레지스트리 종류
+
+| 종류 | 특징 | 적합한 환경 |
+|------|------|------------|
+| **Docker Registry** | 설정 단순, 기능 최소 | 소규모, 빠른 구축 |
+| **Harbor** | UI·권한관리·취약점 스캔 제공 | 팀 운영, 보안 요구 환경 |
+| **Docker Hub** | 공개 이미지 전용 (ollama, vllm 등) | 공개 이미지 사용 시 |
+
+> **현재 환경 판단**: 워커 1대, 폐쇄망 → 레지스트리 없이 `ctr import` 방식이 적합.  
+> 노드가 늘어날 경우 Docker Registry 또는 Harbor 도입을 검토.
+
+---
+
+#### 현재 방식 — 레지스트리 없음 (ctr import)
+
+`deployment.yaml`의 `imagePullPolicy: IfNotPresent` 설정에 의해, **파드가 뜨는 노드(워커)의 containerd에 이미지가 있어야** 합니다.
+
+> Jenkins가 워커에서 실행 중이라면 `scp` 전송 없이 바로 `ctr import` 가능.
+
+**[워커/Jenkins] 빌드 및 import:**
 
 ```bash
 # auth-server 프로젝트 루트에서
 ./gradlew bootWar
 docker build -f deployment/Dockerfile -t auth-server:latest .
-```
 
-**[마스터] tar로 저장 → 워커로 전송:**
-
-```bash
-docker save auth-server:latest -o auth-server.tar
-scp auth-server.tar kube@<워커IP>:~/
-```
-
-**[워커] containerd에 import:**
-
-```bash
-sudo ctr -n k8s.io images import ~/auth-server.tar
+# containerd k8s.io 네임스페이스에 import
+docker save auth-server:latest -o /tmp/auth-server.tar
+sudo ctr -n k8s.io images import /tmp/auth-server.tar
+rm -f /tmp/auth-server.tar
 ```
 
 import 확인:
@@ -591,6 +610,38 @@ import 확인:
 sudo ctr -n k8s.io images list | grep auth-server
 # docker.io/library/auth-server:latest 가 표시되면 정상
 ```
+
+Jenkins가 마스터에서 실행 중이라면 **워커로 전송 후 import**:
+
+```bash
+docker save auth-server:latest -o auth-server.tar
+scp auth-server.tar kube@<워커IP>:~/
+# [워커에서]
+sudo ctr -n k8s.io images import ~/auth-server.tar
+```
+
+---
+
+#### 레지스트리 있을 때 — Docker Registry (참고)
+
+레지스트리가 구축된 경우 `ctr import` 단계가 사라지고 `docker push`로 대체됩니다.
+
+```bash
+# 빌드 시 레지스트리 주소를 태그에 포함
+docker build -f deployment/Dockerfile -t <레지스트리IP>:5000/tomboy/auth-server:latest .
+
+# 레지스트리에 push
+docker push <레지스트리IP>:5000/tomboy/auth-server:latest
+```
+
+`deployment.yaml` 이미지 경로 변경:
+
+```yaml
+image: <레지스트리IP>:5000/tomboy/auth-server:latest
+imagePullPolicy: Always
+```
+
+이후 `kubectl apply`만 하면 쿠버네티스가 각 노드에서 자동으로 pull합니다.
 
 ### 10-3. ConfigMap · Secret 적용 [마스터]
 
