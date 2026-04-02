@@ -599,8 +599,27 @@ sudo ctr -n k8s.io images list | grep auth-server
 
 ```bash
 kubectl apply -f deployment/k8s/configmap.yaml
-kubectl apply -f deployment/k8s/secret.yaml
+kubectl apply -f deployment/k8s/secret.yaml # 권장 하지 않음. 아래 secret 적용 참조
 ```
+
+> secret 적용
+```bash
+# secret은 파일 배포보다 직접 명령을 사용 하는것을 권장한다.
+# 기존 secret 삭제 후 재생성
+kubectl delete secret auth-server-secret -n tomboy
+kubectl create secret generic auth-server-secret \
+    --namespace=tomboy \
+    --from-literal=DB_PASSWORD=실제DB비밀번호 \
+    --from-literal=REDIS_PASSWORD=실제Redis비밀번호
+
+# 또는 덮어쓰기 옵션으로:
+kubectl create secret generic auth-server-secret \
+    --namespace=tomboy \
+    --from-literal=DB_PASSWORD=실제DB비밀번호 \
+    --from-literal=REDIS_PASSWORD=실제Redis비밀번호 \
+    --dry-run=client -o yaml | kubectl apply -f -
+```
+
 
 ### 10-4. Deployment 적용 [마스터]
 
@@ -638,7 +657,91 @@ kubectl apply -f deployment/k8s/deployment.yaml
 kubectl apply -f deployment/k8s/service.yaml
 ```
 
-### 10-6. 확인 — k9s
+### 10-6. k9s 설치 (공용 설치 — 모든 사용자 사용 가능)
+
+> **실행 위치: 마스터 또는 워커 (설치할 노드에서 각각 실행)**  
+> root로 설치한 경우 kube 계정에서 실행이 안 될 수 있습니다.  
+> **공용 경로(`/usr/local/bin`)에 설치하면 모든 사용자가 사용 가능**합니다.
+
+#### 기존 설치 위치 확인
+
+먼저 이미 설치되어 있는지 확인합니다:
+```bash
+# ubuntu 에서 설치 했던 내용은 계정 디렉토리에 설치 됨
+$ curl -sS https://webinstall.dev/k9s | bash
+$ . ~/.bashrc
+```
+
+
+```bash
+# 현재 사용자 기준
+which k9s || echo "k9s not in PATH"
+
+# root 기준
+sudo which k9s
+```
+
+- `which k9s` 출력이 `/usr/local/bin/k9s`이면 → **공용 설치 완료**, 아래 재설치 불필요
+- `/root/...` 같은 경로면 → root 홈에만 있는 것이므로 공용 재설치 필요
+- 아무 출력이 없으면 → 미설치 상태, 아래 절차 진행
+
+#### 최신 버전 공용 설치
+
+```bash
+# 1) 최신 버전 번호 확인 (예: v0.32.7)
+curl -s https://api.github.com/repos/derailed/k9s/releases/latest \
+  | grep '"tag_name"' | sed 's/.*"tag_name": "\(.*\)".*/\1/'
+
+# 2) /tmp에 다운로드 및 압축 해제 (버전은 위 결과로 교체)
+K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest \
+  | grep '"tag_name"' | sed 's/.*"tag_name": "\(.*\)".*/\1/')
+
+cd /tmp
+curl -L -o k9s.tar.gz \
+  "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_amd64.tar.gz"
+
+tar -xzf k9s.tar.gz k9s
+
+# 3) 공용 경로에 설치 (모든 사용자 실행 가능)
+sudo install -m 0755 k9s /usr/local/bin/k9s
+
+# 4) 임시 파일 정리
+rm -f /tmp/k9s /tmp/k9s.tar.gz
+```
+
+#### 폐쇄망 환경 (인터넷 미연결)
+
+인터넷이 되는 PC에서 미리 다운로드 후 서버로 전송합니다:
+
+```bash
+# [인터넷 PC] GitHub Releases 페이지에서 수동 다운로드
+# https://github.com/derailed/k9s/releases → k9s_Linux_amd64.tar.gz
+
+# [인터넷 PC → 서버 전송]
+scp k9s_Linux_amd64.tar.gz kube@<서버IP>:~/
+
+# [서버에서] 압축 해제 및 공용 설치
+cd ~
+tar -xzf k9s_Linux_amd64.tar.gz k9s
+sudo install -m 0755 k9s /usr/local/bin/k9s
+rm -f ~/k9s ~/k9s_Linux_amd64.tar.gz
+```
+
+#### 설치 확인
+
+```bash
+which k9s
+# /usr/local/bin/k9s 가 출력되면 정상
+
+k9s version
+```
+
+> 설치 후 **로그아웃/재로그인 없이** 바로 실행됩니다.  
+> kube, root 등 **모든 계정에서 사용 가능**합니다.
+
+---
+
+### 10-7. 확인 — k9s
 
 ```bash
 k9s -n tomboy
