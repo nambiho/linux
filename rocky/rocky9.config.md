@@ -534,11 +534,11 @@ $ systemctl start postgresql-17
 $ sudo -u postgres psql
 
 postgres=# ALTER USER postgres WITH PASSWORD 'password';
-postres=# CREATE USER user WITH PASSWORD 'password' CREATEROLE CREATEDB;
+postgres=# CREATE USER user WITH PASSWORD 'password' CREATEROLE CREATEDB;
 ~~~
 
 
-# kubenetis
+# kubernetes
 ## k3s
 
 1. k3s 설치 (서버 모드)

@@ -16,6 +16,7 @@
 > 이 문서의 모든 명령은 `kube` 사용자로 실행합니다.  
 > `sudo`가 붙은 명령은 root 권한이 필요하므로, `kube` 사용자가 `sudo` 그룹에 속해 있어야 합니다.  
 > `sudo` 권한이 없다면 먼저 root에서 `usermod -aG wheel kube`를 실행합니다.
+> calico를 이용하기 위해서 179 port를 모두 열어야 합니다.
 
 ---
 
@@ -886,6 +887,206 @@ kubectl get nodes
 ```
 
 파드가 `Running`, 노드가 `Ready`로 전환되면 해결.
+
+---
+
+### Troubleshooting — Calico BGP 미성립 + Pod egress 불가 (Typha 포트 차단)
+
+**증상:**
+
+- `kubectl -n calico-system get pod -l k8s-app=calico-node` 에서 각 노드의 calico-node 가 장시간 `0/1 Running` 상태.
+- Readiness 이벤트: `calico/node is not ready: BIRD is not ready: BGP not established with <peer-ip>`.
+- Pod 에서 외부 HTTPS 접속 실패 (`curl -I https://1.1.1.1` → `Couldn't connect to server`). 호스트에서는 정상.
+- Grafana 가 `grafana.com` 에서 대시보드 import 시 `Bad gateway` (→ Grafana Pod egress 차단의 파생 증상).
+
+**최종 확인된 원인:**
+
+Ubuntu 쪽 노드(예: ai-server-1, 마스터)의 **UFW 에 Calico Typha 포트 `5473/tcp` 가 누락**. BGP 포트 `179/tcp` 만 열려 있음. 그 결과 Rocky 쪽 노드(예: superman)의 calico-node 가 Typha 에 i/o timeout 으로 붙지 못해 confd 가 BGP 설정을 렌더링하지 못하고, `/etc/calico/confd/config/bird.cfg` 가 생성되지 않아 BIRD 가 기동하지 못함. 양쪽 BGP mesh 불성립.
+
+핵심 로그 패턴 (Rocky 워커 calico-node 에서 반복):
+
+```
+[WARNING] felix/sync_client.go: Failed to connect to typha endpoint 192.168.3.194:5473. ... i/o timeout
+bird: Unable to open configuration file /etc/calico/confd/config/bird.cfg: No such file or directory
+```
+
+#### 1) 순차적 확인 명령 (마스터에서 실행)
+
+```bash
+# 1-1. 노드와 calico-node 상태
+kubectl get nodes -o wide
+kubectl -n calico-system get pod -l k8s-app=calico-node -o wide
+
+# 1-2. 각 노드의 Calico IPv4 어노테이션 (예상 값: 노드 INTERNAL-IP/마스크)
+kubectl get node <ubuntu-node>  -o jsonpath='{.metadata.annotations.projectcalico\.org/IPv4Address}{"\n"}'
+kubectl get node <rocky-node>   -o jsonpath='{.metadata.annotations.projectcalico\.org/IPv4Address}{"\n"}'
+
+# 1-3. BIRD peering 상태 (모든 calico-node 파드 대상)
+for p in $(kubectl -n calico-system get pod -l k8s-app=calico-node -o name); do
+  echo "===== $p ====="
+  kubectl -n calico-system exec -c calico-node ${p##*/} -- birdcl show protocols | grep -E 'Mesh|name'
+done
+# 기대값: Mesh_<peer-ip> 가 state=Established 여야 정상.
+# 비정상 예:
+#   - Active / Connect + "Connection refused"  → 반대편 bird 미기동
+#   - Connect + "No route to host" / timeout   → 네트워크/방화벽 차단
+#   - "Unable to connect to server control socket (/var/run/calico/bird.ctl)" → 해당 파드에서 bird 자체 미기동
+
+# 1-4. Installation 자동감지 설정 (spec 과 computed 일치 여부)
+kubectl get installation default -o jsonpath='V4_SPEC={.spec.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
+kubectl get installation default -o jsonpath='V6_SPEC={.spec.calicoNetwork.nodeAddressAutodetectionV6}{"\n"}'
+kubectl get installation default -o jsonpath='V4_COMPUTED={.status.computed.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
+kubectl get installation default -o jsonpath='V6_COMPUTED={.status.computed.calicoNetwork.nodeAddressAutodetectionV6}{"\n"}'
+
+# 1-5. 워커 calico-node 실제 환경 변수
+POD=$(kubectl -n calico-system get pod -l k8s-app=calico-node --field-selector spec.nodeName=<rocky-node> -o name | head -1 | cut -d/ -f2)
+kubectl -n calico-system exec -c calico-node $POD -- \
+  sh -c 'env | grep -E "IP_AUTODETECTION_METHOD|^IP=|CALICO_NETWORKING_BACKEND"'
+
+# 1-6. 워커 calico-node 로그 (핵심 실패 시그널 확인)
+kubectl -n calico-system logs $POD -c calico-node --tail=300 \
+  | grep -E "typha endpoint|bird.cfg|Unable to open configuration"
+
+# 1-7. tigera-operator 반복 에러
+kubectl -n tigera-operator logs deploy/tigera-operator --tail=300 \
+  | grep -i "autodetection\|Invalid\|Degraded" | tail -5
+```
+
+#### 2) 워커(Rocky) 호스트에서 확인 — 로컬 bird 충돌 여부
+
+```bash
+# 호스트에서 179 를 다른 프로세스가 쥐고 있는지
+sudo ss -lntp | grep ':179'
+
+# systemd bird 유무 (있으면 호스트 bird 와 파드 bird 가 충돌)
+systemctl list-unit-files | grep -i bird
+systemctl status bird 2>/dev/null | head -5
+```
+
+> 위 3개 명령이 모두 "무출력" 이면 호스트 측 충돌은 아님. 문제는 네트워크/방화벽 쪽.
+
+#### 3) 워커(Rocky) 에서 마스터(Ubuntu) 로의 Calico 통신 포트 연결 테스트
+
+```bash
+# 마스터 IP 가 192.168.3.194 라고 가정
+nc -vz 192.168.3.194 5473   # Typha (반드시 succeeded)
+nc -vz 192.168.3.194 179    # BGP
+```
+
+- `5473` 에서 **timeout / refused** 가 나오면 이 Troubleshooting 의 전형적 시나리오에 해당.
+
+#### 4) 해결 — 마스터(Ubuntu, UFW) 에 누락 포트 개방
+
+**노드-간 트래픽은 `192.168.3.0/24` 대역이라고 가정.** 환경에 맞게 수정.
+
+```bash
+# [마스터(Ubuntu) 에서 실행]
+# 4-1. 현재 상태
+sudo ufw status verbose
+
+# 4-2. Calico 필수 포트 전부 허용 (대역 제한)
+sudo ufw allow from 192.168.3.0/24 to any port 179  proto tcp   # BGP
+sudo ufw allow from 192.168.3.0/24 to any port 5473 proto tcp   # Typha (핵심)
+sudo ufw allow from 192.168.3.0/24 to any port 4789 proto udp   # VXLAN
+sudo ufw allow from 192.168.3.0/24 to any port 10250 proto tcp  # kubelet
+
+# 4-3. 포워딩 허용 (Pod egress 를 위해 필요)
+sudo ufw default allow routed
+
+# 4-4. 재로드 및 확인
+sudo ufw reload
+sudo ufw status verbose
+```
+
+#### 5) 해결 — 워커(Rocky, firewalld) 쪽도 동일 포트 개방
+
+```bash
+# [워커(Rocky) 에서 실행]
+# 5-1. 상태
+sudo firewall-cmd --state
+sudo firewall-cmd --get-default-zone
+sudo firewall-cmd --list-all
+
+# 5-2. Calico 포트 영구 허용
+sudo firewall-cmd --permanent --add-port=179/tcp
+sudo firewall-cmd --permanent --add-port=5473/tcp
+sudo firewall-cmd --permanent --add-port=4789/udp
+sudo firewall-cmd --permanent --add-port=10250/tcp
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-ports
+
+# 5-3. (선택) 노드 대역을 신뢰 존으로 등록하여 잡음 제거
+sudo firewall-cmd --permanent --zone=trusted --add-source=192.168.3.0/24
+# Pod CIDR 도 파악되면 함께 추가 (예: 10.244.0.0/16)
+sudo firewall-cmd --permanent --zone=trusted --add-source=10.244.0.0/16
+sudo firewall-cmd --reload
+```
+
+#### 6) calico-node 재순환 및 검증
+
+```bash
+# [마스터에서]
+kubectl -n calico-system rollout restart ds/calico-node
+kubectl -n calico-system get pod -l k8s-app=calico-node -o wide -w
+# READY 가 양쪽 모두 1/1 이면 성공
+
+# BGP Mesh Established 확인
+for p in $(kubectl -n calico-system get pod -l k8s-app=calico-node -o name); do
+  echo "===== $p ====="
+  kubectl -n calico-system exec -c calico-node ${p##*/} -- birdcl show protocols | grep -E 'Mesh|Established'
+done
+
+# bird.cfg 가 워커 calico-node 안에 생성 되었는지
+POD=$(kubectl -n calico-system get pod -l k8s-app=calico-node --field-selector spec.nodeName=<rocky-node> -o name | head -1 | cut -d/ -f2)
+kubectl -n calico-system exec -c calico-node $POD -- \
+  sh -c 'ls -l /etc/calico/confd/config/bird.cfg && head -30 /etc/calico/confd/config/bird.cfg'
+
+# Pod egress 최종 확인
+kubectl run netchk --rm -it --image=curlimages/curl --restart=Never -- \
+  sh -c 'curl -sI https://1.1.1.1 | head -1; curl -sI https://grafana.com | head -1'
+
+# Installation 상태
+kubectl get installation default -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.message}{"\n"}{end}'
+# 기대값: Ready=True, Degraded=False, Progressing=False
+```
+
+#### 7) (선택) NIC 2개가 동일 서브넷일 때의 자동감지 고정
+
+워커 노드에 NIC 이 2개(eno1, eno2) 이고 둘 다 동일 `/24` 서브넷 인 경우, Calico 가 `first-found` 로 의도치 않은 NIC 을 선택할 수 있음. 사용할 NIC 을 명시 고정:
+
+```bash
+# [마스터에서]
+kubectl patch installation default --type=merge -p '{
+  "spec": {
+    "calicoNetwork": {
+      "nodeAddressAutodetectionV4": {"interface": "eno1"}
+    }
+  }
+}'
+
+# 반영 확인 (몇 초 대기)
+kubectl get installation default -o jsonpath='V4_COMPUTED={.status.computed.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
+# 기대값: V4_COMPUTED={"interface":"eno1"}
+
+# 옛 어노테이션 캐시가 남아 있으면 제거 후 재시작
+kubectl annotate node <rocky-node> projectcalico.org/IPv4Address-
+kubectl annotate node <rocky-node> projectcalico.org/IPv4VXLANTunnelAddr- 2>/dev/null || true
+kubectl -n calico-system rollout restart ds/calico-node
+```
+
+> `nodeAddressAutodetectionV4` 는 `firstFound / kubernetes / interface / skipInterface / canReach / cidrs` 중 **정확히 하나만** 설정 가능. 2개 이상 존재하면 tigera-operator 가 `no more than one node address autodetection method can be specified per-family` 로 reconcile 을 거부한다. V6 도 동일 규칙.
+
+#### 8) 요약 체크리스트
+
+| 항목 | 확인 명령 | 기대값 |
+|------|-----------|--------|
+| Ubuntu 쪽 UFW | `sudo ufw status verbose` | 179/5473/4789/10250 모두 ALLOW, `routed` 는 allow |
+| Rocky 쪽 firewalld | `sudo firewall-cmd --list-ports` | 179/5473/4789/10250 포함 |
+| 노드 간 Typha 연결 | 워커에서 `nc -vz <master-ip> 5473` | `succeeded` |
+| calico-node READY | `kubectl -n calico-system get pod -l k8s-app=calico-node` | 모든 파드 `1/1` |
+| BGP Mesh | `birdcl show protocols \| grep Mesh` | `state=Established` |
+| bird.cfg | 워커 파드에서 `ls /etc/calico/confd/config/bird.cfg` | 파일 존재 |
+| Pod egress | 테스트 파드에서 `curl -sI https://1.1.1.1` | `HTTP/...` 응답 |
 
 ---
 

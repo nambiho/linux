@@ -734,6 +734,18 @@ curl http://192.168.3.194:32097/ollama/v1/chat/completions \
   ],
   "stream": false
 }'
+
+# uri 가 다를수 있음
+curl http://192.168.3.194:32097/v1/chat/completions \
+-X POST \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "llama3.1:8b",
+  "messages": [
+    { "role": "user", "content": "자기소개를 한 문장으로 해줘." }
+  ],
+  "stream": false
+}'
 ```
 
 ```bash
