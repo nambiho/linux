@@ -1090,6 +1090,329 @@ kubectl -n calico-system rollout restart ds/calico-node
 
 ---
 
+### Troubleshooting — Grafana 에 특정 노드의 메트릭이 보이지 않음 (Prometheus 스크랩 방화벽 차단)
+
+**증상:**
+
+- Grafana "Node Exporter Full" 류 대시보드에 **노드 중 일부만 표시**됨 (예: superman 만 보이고 ai-server-1 은 안 보임).
+- `kubectl get pods -A -o wide | grep node-exporter` 상으로는 DaemonSet 이 `2/2 READY`, 모든 노드에 파드가 정상 기동.
+- Prometheus 내부 쿼리:
+    ```promql
+    up{job="node-exporter"}
+    ```
+    결과에서 한 instance 는 `value=1`, 다른 instance 는 `value=0`.
+
+**최종 확인된 원인:**
+
+monitoring 네임스페이스의 Prometheus 파드는 `nodeSelector: role=app` 로 **superman 에만** 스케줄됨. Prometheus 가 노드 메트릭을 수집하려면 **ai-server-1:9100(node-exporter)** 으로 TCP 접근이 가능해야 하는데, ai-server-1 의 UFW 에 `9100/tcp` 가 열려 있지 않아 스크랩이 drop 되고 `up=0` 이 됨.
+
+같은 이유로 **마스터 노드(ai-server-1)** 의 아래 컴포넌트 메트릭도 누락 가능:
+
+- `kube-controller-manager` → `10257/tcp`
+- `kube-scheduler` → `10259/tcp`
+- `kube-proxy` (metrics) → `10249/tcp`
+- `etcd` → `2381/tcp` (bind 설정 시)
+
+#### 1) 진단
+
+```bash
+# 1-1. DaemonSet/파드 배치는 정상인지 먼저 확인 (toleration, 노드 수)
+kubectl get ds -A | grep -Ei 'node-exporter'
+kubectl get pods -A -o wide | grep -Ei 'node-exporter'
+
+# 1-2. Prometheus 가 실제로 보고 있는 스크랩 상태
+PPOD=$(kubectl -n monitoring get pod -l app.kubernetes.io/name=prometheus -o name | head -1 | cut -d/ -f2)
+kubectl -n monitoring exec -c prometheus $PPOD -- \
+  wget -qO- 'http://localhost:9090/api/v1/query?query=up{job="node-exporter"}' \
+  | python3 -m json.tool
+
+# 1-3. 실패 원인(에러 문자열) 직접 확인
+kubectl -n monitoring exec -c prometheus $PPOD -- \
+  wget -qO- 'http://localhost:9090/api/v1/targets?state=any' \
+  | grep -o '"lastError":"[^"]*"' | sort -u
+# 기대 패턴: "connection timed out" / "i/o timeout" → 방화벽 drop
+#           "connection refused" → 해당 포트 listener 없음
+```
+
+#### 2) 연결성 테스트 (Prometheus 가 있는 노드에서 스크랩 대상 노드로)
+
+```bash
+# Prometheus 가 superman 에 있고, ai-server-1 을 스크랩하지 못하는 경우:
+# superman 에서
+nc -vz 192.168.3.194 9100    # node-exporter
+nc -vz 192.168.3.194 10257   # kube-controller-manager
+nc -vz 192.168.3.194 10259   # kube-scheduler
+nc -vz 192.168.3.194 10249   # kube-proxy metrics
+```
+
+`timed out` → UFW drop 확정.
+
+#### 3) 해결 — ai-server-1(Ubuntu, UFW) 에 모니터링 포트 개방
+
+```bash
+# [ai-server-1 에서 실행]
+sudo ufw allow from 192.168.3.0/24 to any port 9100  proto tcp   # node-exporter
+sudo ufw allow from 192.168.3.0/24 to any port 10257 proto tcp   # kube-controller-manager
+sudo ufw allow from 192.168.3.0/24 to any port 10259 proto tcp   # kube-scheduler
+sudo ufw allow from 192.168.3.0/24 to any port 10249 proto tcp   # kube-proxy metrics
+sudo ufw reload
+sudo ufw status verbose
+```
+
+> `etcd` metrics 를 Prometheus 에 수집하려면 `2381/tcp` 도 추가. 단, etcd 는 기본 bind 가 localhost 라 별도의 `--listen-metrics-urls=http://0.0.0.0:2381` 설정 필요.
+
+#### 4) 해결 — superman(Rocky, firewalld) 도 동일 포트 개방 (반대 방향 수집을 대비)
+
+```bash
+# [superman 에서 실행]
+sudo firewall-cmd --permanent --add-port=9100/tcp
+sudo firewall-cmd --permanent --add-port=10257/tcp
+sudo firewall-cmd --permanent --add-port=10259/tcp
+sudo firewall-cmd --permanent --add-port=10249/tcp
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-ports
+```
+
+#### 5) 검증
+
+- 적용 후 1~2분 내 `up{job="node-exporter"}` 가 모든 instance 에서 `1` 로 전환.
+- Grafana 의 `instance` / `nodename` 변수 드롭다운에 누락 노드가 나타남.
+- "kube-controller-manager" / "kube-scheduler" 관련 대시보드도 함께 정상화.
+
+#### 6) 참고 — 같은 패턴 (다른 증상이 같은 원인)
+
+| 증상 | 실제 원인 |
+|------|-----------|
+| Grafana 에 특정 노드 메트릭 누락 | `9100` 차단 |
+| "kube-controller-manager is down" 알림 | `10257` 차단 |
+| "kube-scheduler is down" 알림 | `10259` 차단 |
+| Loki/Alloy 에 특정 노드 로그 누락 | Alloy DaemonSet taint 미통과 또는 수집 포트(`4317/4318`) 차단 |
+
+---
+
+### 참고 — kubeadm + Calico + kube-prometheus-stack 환경의 열어야 할 포트 모음
+
+아래는 ai-server-1 / superman 양쪽에서 `192.168.3.0/24` 내부로 허용해야 할 최소 포트 목록. 외부(LAN 외부) 에 노출할 필요는 없으므로 반드시 **소스 대역 제한** 으로 허용 권장.
+
+| 포트 | Proto | 방향 | 용도 / 사용처 | 비고 |
+|---|---|---|---|---|
+| `6443` | TCP | 워커 → 마스터 | kube-apiserver | kubeadm join, kubectl |
+| `10250` | TCP | 전 방향 | kubelet API | 노드 간 `kubectl exec/logs`, Prometheus 의 kubelet/cAdvisor 메트릭 스크랩 |
+| `10249` | TCP | Prometheus → 전 노드 | kube-proxy metrics | kps 의 `kube-proxy` ServiceMonitor 대상 |
+| `10257` | TCP | Prometheus → 마스터 | kube-controller-manager metrics | 마스터 컴포넌트 전용 |
+| `10259` | TCP | Prometheus → 마스터 | kube-scheduler metrics | 마스터 컴포넌트 전용 |
+| `2381` | TCP | Prometheus → 마스터 | etcd metrics | etcd `--listen-metrics-urls` 설정 시 |
+| `9100` | TCP | Prometheus → 전 노드 | node-exporter | kps DaemonSet, hostNetwork |
+| `179` | TCP | 전 방향 (노드 간) | Calico BGP (BIRD) | calico-node mesh |
+| `5473` | TCP | 전 방향 (노드 간) | Calico Typha | `calico-node` → `typha` 동기화. 누락 시 confd 가 bird.cfg 못 만듦 |
+| `4789` | UDP | 전 방향 (노드 간) | Calico VXLAN | `encapsulation: VXLAN` 일 때 Pod 간 오버레이 트래픽 |
+| `30000-32767` | TCP | 외부 → 노드 | Kubernetes NodePort 범위 | NodePort 서비스 사용 시 |
+| `4317` / `4318` | TCP | Alloy/Otel → 수집기 | OTLP gRPC / HTTP | 관측 스택에서 사용 시 |
+
+UFW 일괄 적용 예시 (ai-server-1):
+```bash
+# Kubernetes 코어
+sudo ufw allow from 192.168.3.0/24 to any port 6443  proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 10250 proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 10249 proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 10257 proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 10259 proto tcp
+
+# Calico
+sudo ufw allow from 192.168.3.0/24 to any port 179  proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 5473 proto tcp
+sudo ufw allow from 192.168.3.0/24 to any port 4789 proto udp
+
+# Observability
+sudo ufw allow from 192.168.3.0/24 to any port 9100 proto tcp
+
+# Pod egress / 포워딩
+sudo ufw default allow routed
+
+sudo ufw reload
+sudo ufw status verbose
+```
+
+firewalld 일괄 적용 예시 (superman):
+```bash
+for p in 6443 10250 10249 10257 10259 179 5473 9100; do
+  sudo firewall-cmd --permanent --add-port=${p}/tcp
+done
+sudo firewall-cmd --permanent --add-port=4789/udp
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-ports
+```
+
+---
+
+### Troubleshooting — Java 앱 OTLP 송신 시 Alloy 4318 timeout (OTLP receiver 포트 미노출)
+
+#### 1) 현상
+
+- Spring Boot + OTel Java Agent (`-javaagent:/.../opentelemetry-javaagent.jar`) 가 적용된 Pod 가 기동 시 아래 로그를 반복.
+- `OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy.monitoring.svc:4318` 로 설정.
+
+```
+[otel.javaagent ...] ERROR HttpExporter - Failed to export metrics ... Socket closed
+[otel.javaagent ...] ERROR HttpExporter - Failed to export logs ... timeout
+java.io.InterruptedIOException: timeout
+```
+
+- 임시 Pod 에서 직접 curl 시도해도 동일하게 timeout.
+
+```
+* connect to 10.x.x.x port 4318 from 10.244.x.x port xxxxx failed: Operation timed out
+curl: (28) Failed to connect ... port 4318 ... Could not connect to server
+```
+
+#### 2) 원인
+
+- Alloy Service 가 `12345/TCP` (alloy 자체 metrics) 만 노출하고 있음.
+  ```
+  alloy   ClusterIP   10.x.x.x   <none>   12345/TCP
+  ```
+- Alloy `configMap.content` 에는 `otelcol.receiver.otlp` 가 정의되어 4317/4318 listen 하도록 되어 있지만, **Service 객체에 4317/4318 이 노출되어 있지 않아** 클러스터 내부 트래픽이 도달 불가.
+- 즉, **Pod 내부에서는 listen 하지만 Service 가 차단**하는 형태.
+
+#### 3) 해결 — Alloy Helm values 에 포트 노출 + receiver 의 `output` 누락 보완
+
+(1) `alloy.extraPorts` 와 `service.extraPorts` 양쪽 모두 등록 (chart 버전에 따라 둘 다 필요).
+
+```yaml
+alloy:
+  extraPorts:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+  configMap:
+    create: true
+    content: |
+      otelcol.receiver.otlp "default" {
+        grpc { endpoint = "0.0.0.0:4317" }
+        http { endpoint = "0.0.0.0:4318" }
+        output {
+          traces  = [otelcol.exporter.otlp.tempo.input]
+          metrics = [otelcol.exporter.prometheus.prom.input]
+          // logs 는 stdout JSON → loki.source.kubernetes 로 따로 수집하므로 핸들러 불필요
+        }
+      }
+      // ... 기존 exporter 설정
+
+service:
+  enabled: true
+  type: ClusterIP
+  extraPorts:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+```
+
+(2) Helm 적용 후 PORT 확인:
+
+```bash
+helm upgrade alloy grafana/alloy -n monitoring -f values.yaml
+kubectl get svc -n monitoring alloy
+# PORT(S) 에 12345, 4317, 4318 모두 보이면 정상
+```
+
+(3) 앱 측 — OTLP receiver 의 `output { logs = ... }` 를 정의하지 않을 거라면, Java Agent 의 logs 송신을 끄지 않으면 매 5초마다 404 가 발생함. stdout JSON 로그를 `loki.source.kubernetes` 로 이미 수집하는 구성이라면 OTLP logs 는 비활성화 권장.
+
+```yaml
+env:
+  - name: OTEL_LOGS_EXPORTER
+    value: "none"
+```
+
+#### 4) 같은 패턴 (다른 증상이 같은 원인)
+
+| 증상 | 실제 원인 |
+|------|-----------|
+| `HttpExporter - Failed to export ... timeout` | Alloy Service 에 4317/4318 미노출 |
+| `HTTP status code 404. Unable to parse response body` | Alloy `otelcol.receiver.otlp` 의 `output` 에 logs/metrics/traces 중 하나 누락 |
+| 모든 노드 OTLP timeout | DNS 가 아니라 Service 포트 누락 (DNS 는 정상이라도 미노출 포트는 timeout 으로 보임) |
+
+---
+
+### Troubleshooting — Spring Boot Pod 가 0/1 무한 재시작 (Probe 시간 부족)
+
+#### 1) 현상
+
+- `kubectl get pod` 에 READY 가 계속 `0/1` 이고 `RESTARTS` 가 증가.
+- `kubectl describe pod` Events:
+  ```
+  Warning  Unhealthy  ... Readiness probe failed: ... 8100: connect: connection refused
+  Warning  BackOff    ... Back-off restarting failed container
+  ```
+- `kubectl logs` 로 보면 어플리케이션 자체는 정상 기동 중. 마지막에 `Started ... Application in 78.782 seconds` 등이 찍힘.
+
+#### 2) 원인
+
+- OTel Java Agent + Spring Security + JPA + Flyway + Redis 등의 초기화로 **기동에 60~120초** 소요.
+- 기존 probe 설정:
+  ```yaml
+  livenessProbe.initialDelaySeconds: 60
+  readinessProbe.initialDelaySeconds: 30
+  ```
+- 60 초 시점에 liveness 가 health endpoint 에 접근하지만 아직 기동 중이라 실패 → kubelet 이 컨테이너를 재시작 → 다시 기동 시도 → 다시 60 초에 실패. **무한 루프.**
+
+#### 3) 해결 — `startupProbe` 도입
+
+`startupProbe` 가 통과될 때까지 `livenessProbe` / `readinessProbe` 는 동작하지 않음. 이 구간 동안만 길게 봐주는 것이 원칙.
+
+```yaml
+startupProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8100
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 30      # 30 + 30*10 = 최대 330초 부팅 허용
+livenessProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8100
+  periodSeconds: 20
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8100
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+추가로 Jenkins 파이프라인에서 `kubectl rollout status --timeout=120s` 로 짧게 잡혀 있으면 배포 단계에서 실패로 표기되므로 함께 늘림.
+
+```groovy
+sh "/usr/bin/kubectl rollout status deployment/${env.DEPLOY_NAME} -n tomboy --timeout=360s"
+```
+
+#### 4) 핵심 원리
+
+- `livenessProbe.initialDelaySeconds` 는 **단발성 지연**이라 부팅 시간이 들쑥날쑥하면 부적합.
+- `startupProbe` 는 **부팅 단계 전용 게이트** 역할. 통과 후에는 자동으로 사라짐.
+- liveness/readiness 는 **운영 중 헬스체크**가 본래 목적이므로 `initialDelaySeconds` 는 0~짧게 두는 게 정석.
+
+#### 5) 같은 패턴 (다른 증상이 같은 원인)
+
+| 증상 | 실제 원인 |
+|------|-----------|
+| `Back-off restarting failed container` 무한 반복 | startupProbe 미사용 + 부팅 시간 > liveness initialDelay |
+| 배포 직후만 0/1, 시간 지나면 1/1 | 부팅 시간이 readiness initialDelay 와 비슷한 경계 |
+| Jenkins `rollout status timeout` | 파이프라인의 timeout 이 startupProbe 최대 시간보다 짧음 |
+
+---
+
 ## 한 줄 요약
 
 ```
